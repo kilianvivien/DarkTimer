@@ -1,0 +1,5 @@
+{
+  "name": "DarkTimer",
+  "description": "A utilitarian film development timer with manual controls and AI-powered recipe assistance.",
+  "requestFramePermissions": []
+}
