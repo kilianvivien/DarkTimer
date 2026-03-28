@@ -1,6 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { getGeminiApiKey } from "./settings";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+function getClient(): GoogleGenAI {
+  const key = getGeminiApiKey() || process.env.GEMINI_API_KEY || "";
+  return new GoogleGenAI({ apiKey: key });
+}
 
 export interface DevPhase {
   name: string;
@@ -26,7 +30,7 @@ export interface DevResponse {
 
 export async function getDevTimes(film: string, developer: string, iso: string, temp: string, dilution: string): Promise<DevResponse | null> {
   try {
-    const response = await ai.models.generateContent({
+    const response = await getClient().models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Find the standard development times for ${film} at ISO ${iso} using ${developer} at ${temp}${dilution ? ` with dilution ${dilution}` : ''}. 
       Return a structured JSON object with an array of "options". 

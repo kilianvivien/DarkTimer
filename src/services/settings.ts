@@ -7,6 +7,15 @@ export interface UserSettings {
 }
 
 const STORAGE_KEY = 'darktimer_settings';
+const GEMINI_KEY_STORAGE = 'darktimer_gemini_key';
+
+export function getGeminiApiKey(): string {
+  return localStorage.getItem(GEMINI_KEY_STORAGE) ?? '';
+}
+
+export function saveGeminiApiKey(key: string): void {
+  localStorage.setItem(GEMINI_KEY_STORAGE, key);
+}
 
 const DEFAULT_SETTINGS: UserSettings = {
   defaultStopBath: 30,
