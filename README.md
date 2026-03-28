@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# DarkTimer
 
-# Run and deploy your AI Studio app
+A utilitarian darkroom timer for analog film development. Look up development recipes via AI, build custom multi-phase workflows, and run guided timers with agitation cues — all in a minimal dark-mode interface.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/59c4b325-7dfc-4284-bc5c-099ea4bfdc41
+- **AI Recipe Finder** — query development times for any film/developer combination via Google Gemini
+- **Manual Recipe Builder** — create custom multi-phase development workflows (Developer, Stop Bath, Fixer, Wash)
+- **Interactive Timer** — countdown with per-phase agitation cues and audio beeps
+- **Recipe Library** — save and reuse your development presets
+- **Settings** — configure default phase durations and agitation cycles
 
-## Run Locally
+## Stack
 
-**Prerequisites:**  Node.js
+React 19 · Vite 6 · TypeScript · Tailwind CSS v4 · Tauri v2
 
+## Getting Started
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**Prerequisites:** Node.js, a [Gemini API key](https://aistudio.google.com/apikey)
+
+```bash
+npm install
+cp .env.example .env.local
+# add your GEMINI_API_KEY to .env.local
+npm run dev
+```
+
+### Desktop app (Tauri)
+
+**Additional prerequisite:** [Rust](https://rustup.rs)
+
+```bash
+npm run tauri:dev      # development
+npm run tauri:build    # package for distribution
+```
