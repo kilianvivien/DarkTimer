@@ -1,9 +1,11 @@
+import { DEFAULT_BW_TEMP_C, DEFAULT_COLOR_TEMP_C, ProcessMode } from './recipe';
+
 export interface UserSettings {
   defaultStopBath: number; // seconds
   defaultFixer: number; // seconds
   defaultWash: number; // seconds
-  agitationDuration: number; // seconds (e.g. 5s)
-  agitationInterval: number; // seconds (e.g. 60s)
+  defaultBwTempC: number;
+  defaultColorTempC: number;
   notificationsEnabled: boolean;
 }
 
@@ -22,16 +24,34 @@ const DEFAULT_SETTINGS: UserSettings = {
   defaultStopBath: 30,
   defaultFixer: 300,
   defaultWash: 600,
-  agitationDuration: 5,
-  agitationInterval: 60,
+  defaultBwTempC: DEFAULT_BW_TEMP_C,
+  defaultColorTempC: DEFAULT_COLOR_TEMP_C,
   notificationsEnabled: false,
 };
+
+function clampNumber(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  return fallback;
+}
 
 export function getSettings(): UserSettings {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return DEFAULT_SETTINGS;
+
   try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+
+    return {
+      defaultStopBath: clampNumber(parsed.defaultStopBath, DEFAULT_SETTINGS.defaultStopBath),
+      defaultFixer: clampNumber(parsed.defaultFixer, DEFAULT_SETTINGS.defaultFixer),
+      defaultWash: clampNumber(parsed.defaultWash, DEFAULT_SETTINGS.defaultWash),
+      defaultBwTempC: clampNumber(parsed.defaultBwTempC, DEFAULT_SETTINGS.defaultBwTempC),
+      defaultColorTempC: clampNumber(parsed.defaultColorTempC, DEFAULT_SETTINGS.defaultColorTempC),
+      notificationsEnabled: Boolean(parsed.notificationsEnabled),
+    };
   } catch (e) {
     return DEFAULT_SETTINGS;
   }
@@ -39,4 +59,11 @@ export function getSettings(): UserSettings {
 
 export function saveSettings(settings: UserSettings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+export function getDefaultTemperatureForMode(
+  mode: ProcessMode,
+  settings: UserSettings = getSettings(),
+): number {
+  return mode === 'bw' ? settings.defaultBwTempC : settings.defaultColorTempC;
 }

@@ -1,32 +1,73 @@
-import React, { useState } from 'react';
-import { Search, Sparkles, Loader2, Info, Plus } from 'lucide-react';
-import { getDevTimes, DevRecipe, DevResponse } from '../services/gemini';
-import { motion } from 'motion/react';
-import { cn } from '../lib/utils';
+import React, { useEffect, useState } from 'react';
+import { Sparkles, Loader2, Info, Plus, Settings } from 'lucide-react';
+import { getDevTimes, DevResponse } from '../services/gemini';
+import { AnimatePresence, motion } from 'motion/react';
+import { DevRecipe, ProcessMode, formatTemperature } from '../services/recipe';
+import { savePreset } from '../services/presets';
+import { getDefaultTemperatureForMode, getGeminiApiKey, getSettings } from '../services/settings';
+import { ProcessModeSwitch } from './ProcessModeSwitch';
 
 interface FilmSearchProps {
   onRecipeFound: (recipe: DevRecipe) => void;
+  onOpenSettings: () => void;
 }
 
-export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
+export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSettings }) => {
+  const settings = getSettings();
   const [film, setFilm] = useState('');
   const [developer, setDeveloper] = useState('');
   const [dilution, setDilution] = useState('');
   const [iso, setIso] = useState('400');
-  const [temp, setTemp] = useState('20°C');
+  const [processMode, setProcessMode] = useState<ProcessMode>('bw');
+  const [tempC, setTempC] = useState(() => getDefaultTemperatureForMode('bw', settings));
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DevResponse | null>(null);
   const [error, setError] = useState('');
+  const [showMissingKeyWarning, setShowMissingKeyWarning] = useState(false);
+  const [isOffline, setIsOffline] = useState(() =>
+    typeof navigator !== 'undefined' ? !navigator.onLine : false,
+  );
+
+  useEffect(() => {
+    const syncConnectivity = () => {
+      setIsOffline(!navigator.onLine);
+    };
+
+    window.addEventListener('online', syncConnectivity);
+    window.addEventListener('offline', syncConnectivity);
+
+    return () => {
+      window.removeEventListener('online', syncConnectivity);
+      window.removeEventListener('offline', syncConnectivity);
+    };
+  }, []);
+
+  const handleProcessModeChange = (nextMode: ProcessMode) => {
+    setProcessMode(nextMode);
+    setTempC(getDefaultTemperatureForMode(nextMode, settings));
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!film || !developer) return;
+    if (!getGeminiApiKey().trim()) {
+      setShowMissingKeyWarning(true);
+      setError('');
+      return;
+    }
+    if (!film || !developer) {
+      setError('Enter at least a film and developer before asking AI.');
+      return;
+    }
+    if (isOffline) {
+      setError('AI lookup requires an internet connection.');
+      return;
+    }
 
     setLoading(true);
     setError('');
     setResults(null);
     
-    const response = await getDevTimes(film, developer, iso, temp, dilution);
+    const response = await getDevTimes(film, developer, iso, tempC, dilution, processMode);
     
     if (response && response.options.length > 0) {
       setResults(response);
@@ -39,7 +80,21 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
   return (
     <div className="w-full max-w-2xl space-y-8">
       <form onSubmit={handleSearch} className="space-y-6 utilitarian-border p-6 bg-dark-panel">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1.7fr_0.8fr] gap-4 items-end">
+          <ProcessModeSwitch value={processMode} onChange={handleProcessModeChange} />
+          <div className="space-y-1">
+            <label className="mono-label">Temperature (°C)</label>
+            <input
+              type="number"
+              value={tempC}
+              onChange={(e) => setTempC(parseFloat(e.target.value) || 0)}
+              className="utilitarian-input w-full"
+              step="0.5"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-1 col-span-2 md:col-span-1">
             <label className="mono-label">Film</label>
             <input
@@ -80,21 +135,12 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
               className="utilitarian-input w-full"
             />
           </div>
-          <div className="space-y-1">
-            <label className="mono-label">Temp</label>
-            <input
-              type="text"
-              value={temp}
-              onChange={(e) => setTemp(e.target.value)}
-              className="utilitarian-input w-full"
-            />
-          </div>
         </div>
 
         <div className="flex items-center justify-end">
           <button
             type="submit"
-            disabled={loading || !film || !developer}
+            disabled={loading || isOffline}
             className="w-full sm:w-auto utilitarian-button bg-white text-black flex items-center justify-center space-x-2 disabled:opacity-50"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
@@ -102,6 +148,11 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
           </button>
         </div>
 
+        {isOffline && (
+          <p className="text-[10px] font-mono text-ui-gray text-center">
+            You&apos;re offline. Manual mode, presets, and timers still work, but AI lookup is unavailable.
+          </p>
+        )}
         {error && <p className="text-[10px] font-mono text-accent-red text-center">{error}</p>}
       </form>
 
@@ -125,7 +176,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-bold text-white">{option.film} @ {option.iso}</h4>
-                    <span className="mono-label text-accent-red">{option.temp}</span>
+                    <span className="mono-label text-accent-red">{formatTemperature(option.tempC)}</span>
                   </div>
                   <div className="flex justify-between items-end">
                     <div className="text-[10px] font-mono text-ui-gray">
@@ -139,7 +190,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
                 </button>
                 <button
                   onClick={() => {
-                    import('../services/presets').then(m => m.savePreset(option));
+                    savePreset(option);
                     alert('Recipe saved to library');
                   }}
                   className="utilitarian-button px-3 hover:bg-accent-red hover:text-white hover:border-accent-red"
@@ -152,7 +203,54 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
           </div>
         </motion.div>
       )}
+
+      <AnimatePresence>
+        {showMissingKeyWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 md:p-6"
+            onClick={() => setShowMissingKeyWarning(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="bg-dark-panel border border-dark-border max-w-md w-full p-6 md:p-8 space-y-5"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="space-y-2">
+                <p className="text-white font-mono text-sm uppercase tracking-widest">Gemini API key required</p>
+                <p className="text-sm text-ui-gray leading-relaxed">
+                  The AI Assistant needs a Gemini API key before it can look up development times. You can add it in Settings and come straight back here.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMissingKeyWarning(false);
+                    onOpenSettings();
+                  }}
+                  className="flex-1 utilitarian-button bg-white text-black hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2"
+                >
+                  <Settings size={16} />
+                  <span>Open Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMissingKeyWarning(false)}
+                  className="flex-1 utilitarian-button"
+                >
+                  Not now
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
-

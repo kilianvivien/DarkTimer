@@ -1,17 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { Timer } from './components/Timer';
-import { FilmSearch } from './components/FilmSearch';
+import React, { Suspense, lazy, startTransition, useEffect, useState } from 'react';
 import { ManualTimerForm } from './components/ManualTimerForm';
-import { PresetLibrary } from './components/PresetLibrary';
-import { SettingsMenu } from './components/SettingsMenu';
-import { DevRecipe } from './services/gemini';
+import { DevRecipe } from './services/recipe';
 import { Preset, getPresets } from './services/presets';
-import { Camera, Sparkles, ChevronLeft, Info, Library, Settings, Sliders, Github } from 'lucide-react';
+import { Camera, Sparkles, Info, Library, Settings, Sliders, Github } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import ReactMarkdown from 'react-markdown';
 import { cn } from './lib/utils';
 
 type View = 'manual' | 'ai' | 'library' | 'settings' | 'timer';
+
+const FilmSearch = lazy(() =>
+  import('./components/FilmSearch').then((module) => ({ default: module.FilmSearch })),
+);
+const PresetLibrary = lazy(() =>
+  import('./components/PresetLibrary').then((module) => ({ default: module.PresetLibrary })),
+);
+const SettingsMenu = lazy(() =>
+  import('./components/SettingsMenu').then((module) => ({ default: module.SettingsMenu })),
+);
+const SessionView = lazy(() =>
+  import('./components/SessionView').then((module) => ({ default: module.SessionView })),
+);
 
 const NAV_ITEMS: { view: View; label: string; Icon: React.FC<{ size?: number; className?: string }> }[] = [
   { view: 'manual',   label: 'Manual',   Icon: Sliders },
@@ -27,21 +35,31 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
-    setPresets(getPresets());
+    if (view === 'library') {
+      setPresets(getPresets());
+    }
   }, [view]);
 
   const handleStartTimer = (newRecipe: DevRecipe) => {
     setRecipe(newRecipe);
-    setView('timer');
+    startTransition(() => setView('timer'));
   };
 
   const reset = () => {
     setRecipe(null);
-    setView('manual');
+    startTransition(() => setView('manual'));
   };
 
   const refreshPresets = () => {
     setPresets(getPresets());
+  };
+
+  const changeView = (nextView: View) => {
+    if (view === 'timer') {
+      return;
+    }
+
+    startTransition(() => setView(nextView));
   };
 
   const activeView = view === 'timer' ? 'manual' : view;
@@ -62,7 +80,7 @@ export default function App() {
               {NAV_ITEMS.map(({ view: v, label }) => (
                 <button
                   key={v}
-                  onClick={() => view !== 'timer' && setView(v)}
+                  onClick={() => changeView(v)}
                   disabled={view === 'timer'}
                   className={cn(
                     "px-4 h-14 font-mono text-xs uppercase tracking-widest transition-all border-b-2",
@@ -115,113 +133,75 @@ export default function App() {
           )}
 
           {view === 'ai' && (
-            <motion.div
-              key="ai"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center space-y-6 md:space-y-8"
-            >
-              <div className="text-center space-y-2">
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">AI Assistant</h1>
-                <p className="mono-label">Search for recipes using Gemini</p>
-              </div>
-              <FilmSearch onRecipeFound={handleStartTimer} />
-            </motion.div>
+            <Suspense fallback={<ViewLoader label="Loading AI assistant" />}>
+              <motion.div
+                key="ai"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex flex-col items-center space-y-6 md:space-y-8"
+              >
+                <div className="text-center space-y-2">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">AI Assistant</h1>
+                  <p className="mono-label">Search for recipes using Gemini</p>
+                </div>
+                <FilmSearch onRecipeFound={handleStartTimer} onOpenSettings={() => changeView('settings')} />
+              </motion.div>
+            </Suspense>
           )}
 
           {view === 'library' && (
-            <motion.div
-              key="library"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center space-y-6 md:space-y-8"
-            >
-              <div className="text-center space-y-2">
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Library</h1>
-                <p className="mono-label">Your saved presets</p>
-              </div>
-              <PresetLibrary
-                presets={presets}
-                onSelect={handleStartTimer}
-                onDelete={refreshPresets}
-              />
-            </motion.div>
+            <Suspense fallback={<ViewLoader label="Loading library" />}>
+              <motion.div
+                key="library"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex flex-col items-center space-y-6 md:space-y-8"
+              >
+                <div className="text-center space-y-2">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Library</h1>
+                  <p className="mono-label">Your saved presets</p>
+                </div>
+                <PresetLibrary
+                  presets={presets}
+                  onSelect={handleStartTimer}
+                  onDelete={refreshPresets}
+                />
+              </motion.div>
+            </Suspense>
           )}
 
           {view === 'settings' && (
-            <motion.div
-              key="settings"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center space-y-6 md:space-y-8"
-            >
-              <div className="text-center space-y-2">
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Settings</h1>
-                <p className="mono-label">Configure your darkroom defaults</p>
-              </div>
-              <SettingsMenu onSave={() => setView('manual')} />
-            </motion.div>
+            <Suspense fallback={<ViewLoader label="Loading settings" />}>
+              <motion.div
+                key="settings"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex flex-col items-center space-y-6 md:space-y-8"
+              >
+                <div className="text-center space-y-2">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Settings</h1>
+                  <p className="mono-label">Configure your darkroom defaults</p>
+                </div>
+                <SettingsMenu onSave={() => changeView('manual')} />
+              </motion.div>
+            </Suspense>
           )}
 
           {view === 'timer' && (
-            <motion.div
-              key="timer"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex flex-col-reverse md:flex-row gap-6 md:gap-12 items-start justify-center"
-            >
-              <div className="flex-1 space-y-4 md:space-y-6 w-full">
-                <button
-                  onClick={reset}
-                  className="flex items-center space-x-2 mono-label hover:text-white transition-colors"
-                >
-                  <ChevronLeft size={12} />
-                  <span>Exit Session</span>
-                </button>
-
-                <div className="bg-dark-panel p-4 md:p-6 utilitarian-border space-y-4 md:space-y-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h2 className="text-xl md:text-2xl font-bold text-white uppercase tracking-tight">{recipe?.film}</h2>
-                      <p className="text-accent-red font-mono uppercase tracking-widest text-[10px]">
-                        {recipe?.developer} • {recipe?.dilution} • ISO {recipe?.iso}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="mono-label">Temp</p>
-                      <p className="text-lg text-white font-bold font-mono">{recipe?.temp}</p>
-                    </div>
-                  </div>
-
-                  {recipe?.source && (
-                    <div className="pt-4 border-t border-dark-border">
-                      <p className="mono-label mb-1">Source</p>
-                      <p className="text-xs text-ui-gray font-mono">{recipe.source}</p>
-                    </div>
-                  )}
-
-                  {recipe?.notes && (
-                    <div className="pt-4 border-t border-dark-border">
-                      <p className="mono-label mb-2">Notes</p>
-                      <div className="text-xs text-ui-gray leading-relaxed prose prose-invert prose-sm max-w-none">
-                        <ReactMarkdown>{recipe.notes}</ReactMarkdown>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-full md:w-auto">
-                <Timer
-                  phases={recipe?.phases || []}
-                  onComplete={() => {}}
-                />
-              </div>
-            </motion.div>
+            <Suspense fallback={<ViewLoader label="Preparing session" />}>
+              <motion.div
+                key="timer"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full"
+              >
+                <SessionView recipe={recipe} onExit={reset} />
+              </motion.div>
+            </Suspense>
           )}
         </AnimatePresence>
       </main>
@@ -246,7 +226,7 @@ export default function App() {
           {NAV_ITEMS.map(({ view: v, label, Icon }) => (
             <button
               key={v}
-              onClick={() => view !== 'timer' && setView(v)}
+              onClick={() => changeView(v)}
               disabled={view === 'timer'}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 flex-1 py-3 transition-colors",
@@ -286,25 +266,33 @@ export default function App() {
               <div className="space-y-5 text-sm font-mono text-ui-gray leading-relaxed">
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Manual</p>
-                  <p>Enter your film, developer, dilution, ISO and temperature. DarkTimer will walk you through each phase (developer → stop → fixer → wash) with a countdown and agitation alerts.</p>
+                  <p>Choose your process mode, confirm the default temperature, and build a phase-by-phase manual recipe with explicit agitation choices.</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">AI Assistant</p>
-                  <p>Let Gemini suggest development times based on your film and chemistry. Add your Gemini API key in Settings first. The AI looks up published data from sources like the Massive Dev Chart.</p>
+                  <p>Let Gemini suggest development times based on your film, chemistry, process mode, and temperature. Add your Gemini API key in Settings first.</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Library</p>
-                  <p>Recipes you start from the AI Assistant are automatically saved here. Tap any preset to jump straight into a timer session.</p>
+                  <p>Save recipes from Manual or AI mode to keep them here. Tap any preset to jump straight into a timer session.</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Settings</p>
-                  <p>Set your default stop bath, fixer and wash durations, and configure agitation interval and duration. Paste your Gemini API key to enable the AI Assistant.</p>
+                  <p>Set your default stop bath, fixer, wash, and process temperatures. Paste your Gemini API key to enable the AI Assistant.</p>
                 </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function ViewLoader({ label }: { label: string }) {
+  return (
+    <div className="w-full max-w-2xl utilitarian-border bg-dark-panel p-8 text-center">
+      <p className="mono-label">{label}</p>
     </div>
   );
 }

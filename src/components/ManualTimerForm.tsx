@@ -1,39 +1,94 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Trash2, Play } from 'lucide-react';
-import { DevPhase, DevRecipe } from '../services/gemini';
-import { getSettings } from '../services/settings';
+import {
+  AgitationMode,
+  DevPhase,
+  DevRecipe,
+  ProcessMode,
+  getAgitationDescription,
+  getAgitationLabel,
+} from '../services/recipe';
+import { savePreset } from '../services/presets';
+import { getDefaultTemperatureForMode, getSettings } from '../services/settings';
+import { ProcessModeSwitch } from './ProcessModeSwitch';
 
 interface ManualTimerFormProps {
   onStart: (recipe: DevRecipe) => void;
 }
 
+const AGITATION_OPTIONS: AgitationMode[] = ['every-60s', 'every-30s', 'stand'];
+
+const createDefaultPhases = (): DevPhase[] => [
+  { name: 'Developer', duration: 360, agitationMode: 'every-60s' },
+  { name: 'Stop Bath', duration: 30, agitationMode: 'stand' },
+  { name: 'Fixer', duration: 300, agitationMode: 'every-60s' },
+  { name: 'Wash', duration: 600, agitationMode: 'stand' },
+];
+
 export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => {
+  const settings = getSettings();
   const [film, setFilm] = useState('');
   const [developer, setDeveloper] = useState('');
   const [dilution, setDilution] = useState('');
-  const [phases, setPhases] = useState<DevPhase[]>([]);
+  const [processMode, setProcessMode] = useState<ProcessMode>('bw');
+  const [tempC, setTempC] = useState(() => getDefaultTemperatureForMode('bw', settings));
+  const [phases, setPhases] = useState<DevPhase[]>(() => {
+    const defaults = createDefaultPhases();
 
-  useEffect(() => {
-    const settings = getSettings();
-    setPhases([
-      { name: 'Developer', duration: 360, agitation: `Agitate ${settings.agitationDuration}s every ${settings.agitationInterval}s` },
-      { name: 'Stop Bath', duration: settings.defaultStopBath },
-      { name: 'Fixer', duration: settings.defaultFixer },
-      { name: 'Wash', duration: settings.defaultWash },
-    ]);
-  }, []);
+    return defaults.map((phase) => {
+      if (phase.name === 'Stop Bath') {
+        return { ...phase, duration: settings.defaultStopBath };
+      }
+      if (phase.name === 'Fixer') {
+        return { ...phase, duration: settings.defaultFixer };
+      }
+      if (phase.name === 'Wash') {
+        return { ...phase, duration: settings.defaultWash };
+      }
+
+      return phase;
+    });
+  });
+
+  const handleProcessModeChange = (nextMode: ProcessMode) => {
+    setProcessMode(nextMode);
+    setTempC(getDefaultTemperatureForMode(nextMode, settings));
+  };
 
   const addPhase = () => {
-    setPhases([...phases, { name: 'New Phase', duration: 60 }]);
+    setPhases([...phases, { name: 'New Phase', duration: 60, agitationMode: 'stand' }]);
   };
 
   const removePhase = (index: number) => {
     setPhases(phases.filter((_, i) => i !== index));
   };
 
-  const updatePhase = (index: number, field: keyof DevPhase, value: string | number) => {
+  const updatePhase = (
+    index: number,
+    field: keyof DevPhase,
+    value: string | number | AgitationMode | null,
+  ) => {
     const newPhases = [...phases];
     newPhases[index] = { ...newPhases[index], [field]: value };
+
+    if (field === 'agitationMode') {
+      const currentPhaseName = newPhases[index].name.trim().toLowerCase();
+      const developerIndex = newPhases.findIndex((phase) => phase.name.trim().toLowerCase() === 'developer');
+
+      if (currentPhaseName === 'developer') {
+        newPhases.forEach((phase, phaseIndex) => {
+          if (phaseIndex !== index && phase.name.trim().toLowerCase() === 'fixer') {
+            newPhases[phaseIndex] = { ...phase, agitationMode: value as AgitationMode | null };
+          }
+        });
+      } else if (currentPhaseName === 'fixer' && developerIndex >= 0) {
+        newPhases[index] = {
+          ...newPhases[index],
+          agitationMode: newPhases[developerIndex].agitationMode ?? 'stand',
+        };
+      }
+    }
+
     setPhases(newPhases);
   };
 
@@ -54,21 +109,48 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
     setPhases(newPhases);
   };
 
+  const buildRecipe = (): DevRecipe => ({
+    film: film || 'Custom Film',
+    developer: developer || 'Custom Dev',
+    dilution: dilution || 'N/A',
+    iso: 400,
+    tempC,
+    processMode,
+    phases: phases.map((phase) => {
+      const agitationMode = phase.agitationMode ?? 'stand';
+
+      return {
+        ...phase,
+        agitationMode,
+        agitation: getAgitationDescription(agitationMode),
+      };
+    }),
+    notes: 'Manual entry',
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onStart({
-      film: film || 'Custom Film',
-      developer: developer || 'Custom Dev',
-      dilution: dilution || 'N/A',
-      iso: 400,
-      temp: '20°C',
-      phases,
-      notes: 'Manual entry',
-    });
+    onStart(buildRecipe());
   };
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-8">
+      <div className="utilitarian-border bg-dark-panel p-5 md:p-6 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1.7fr_0.8fr] gap-4 items-end">
+          <ProcessModeSwitch value={processMode} onChange={handleProcessModeChange} />
+          <div className="space-y-1">
+            <label className="mono-label">Temperature (°C)</label>
+            <input
+              type="number"
+              value={tempC}
+              onChange={(e) => setTempC(parseFloat(e.target.value) || 0)}
+              className="utilitarian-input w-full"
+              step="0.5"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-1">
           <label className="mono-label">Film Stock</label>
@@ -167,13 +249,18 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
                     </div>
                   </div>
                   <div className="flex-1">
-                    <input
-                      type="text"
-                      value={phase.agitation || ''}
-                      placeholder="Agitation notes..."
-                      onChange={(e) => updatePhase(i, 'agitation', e.target.value)}
-                      className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full text-xs text-ui-gray italic"
-                    />
+                    <label className="mono-label mb-1 block">Agitation</label>
+                    <select
+                      value={phase.agitationMode ?? 'stand'}
+                      onChange={(e) => updatePhase(i, 'agitationMode', e.target.value as AgitationMode)}
+                      className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
+                    >
+                      {AGITATION_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {getAgitationLabel(option)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -186,16 +273,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
         <button
           type="button"
           onClick={() => {
-            const recipe = {
-              film: film || 'Custom Film',
-              developer: developer || 'Custom Dev',
-              dilution: dilution || 'N/A',
-              iso: 400,
-              temp: '20°C',
-              phases,
-              notes: 'Manual entry',
-            };
-            import('../services/presets').then(m => m.savePreset(recipe));
+            savePreset(buildRecipe());
             alert('Recipe saved to library');
           }}
           className="flex-1 utilitarian-button py-4 hover:bg-white hover:text-black"

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, SkipForward, Bell, BellOff } from 'lucide-react';
+import { RotateCcw, SkipForward, Bell, BellOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
-import { DevPhase } from '../services/gemini';
+import { DevPhase, getAgitationDescription, getAgitationInterval } from '../services/recipe';
 import { getSettings } from '../services/settings';
 import { showNotification } from '../services/notifications';
 
@@ -12,6 +12,7 @@ interface TimerProps {
 }
 
 export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
+  const notificationsEnabled = getSettings().notificationsEnabled;
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(phases[0]?.duration || 0);
   const [isActive, setIsActive] = useState(false);
@@ -19,12 +20,26 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
   const [isAgitating, setIsAgitating] = useState(false);
   
   const audioContextRef = useRef<AudioContext | null>(null);
-  const settings = getSettings();
+  const lastAgitationCueRef = useRef<string | null>(null);
+
+  const AGITATION_ALERT_SECONDS = 5;
 
   useEffect(() => {
-    if (phases.length > 0) {
-      setTimeLeft(phases[currentPhaseIndex].duration);
+    setCurrentPhaseIndex(0);
+    setTimeLeft(phases[0]?.duration || 0);
+    setIsActive(false);
+    setIsAgitating(false);
+    lastAgitationCueRef.current = null;
+  }, [phases]);
+
+  useEffect(() => {
+    if (!phases[currentPhaseIndex]) {
+      return;
     }
+
+    setTimeLeft(phases[currentPhaseIndex].duration);
+    setIsAgitating(false);
+    lastAgitationCueRef.current = null;
   }, [phases, currentPhaseIndex]);
 
   useEffect(() => {
@@ -38,13 +53,13 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
       playBeep(880, 0.5); // End of phase beep
       if (currentPhaseIndex < phases.length - 1) {
         const nextPhase = phases[currentPhaseIndex + 1];
-        if (settings.notificationsEnabled) {
+        if (notificationsEnabled) {
           showNotification(`${phases[currentPhaseIndex].name} complete`, `Next: ${nextPhase.name}`);
         }
         setCurrentPhaseIndex((prev) => prev + 1);
         setIsActive(false);
       } else {
-        if (settings.notificationsEnabled) {
+        if (notificationsEnabled) {
           showNotification('Development complete', 'All phases finished.');
         }
         setIsActive(false);
@@ -53,7 +68,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     }
 
     return () => clearInterval(interval);
-  }, [isActive, timeLeft, currentPhaseIndex, phases]);
+  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, phases, timeLeft]);
 
   // Agitation Logic
   useEffect(() => {
@@ -63,29 +78,33 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     }
 
     const currentPhase = phases[currentPhaseIndex];
-    // Only agitate for Developer or if specified in agitation notes
-    const shouldAgitate = currentPhase.name.toLowerCase().includes('dev') || currentPhase.agitation;
-    
-    if (!shouldAgitate) {
+    const agitationInterval = getAgitationInterval(currentPhase.agitationMode);
+
+    if (!agitationInterval) {
       setIsAgitating(false);
       return;
     }
 
     const elapsed = currentPhase.duration - timeLeft;
-    const cycleTime = elapsed % settings.agitationInterval;
-    
-    const agitating = cycleTime < settings.agitationDuration;
-    
-    if (agitating && !isAgitating) {
-      playBeep(440, 0.2); // Agitation start beep
-      if (settings.notificationsEnabled) {
-        showNotification('Agitate now', currentPhase.agitation || undefined);
+    const cycleTime = elapsed % agitationInterval;
+    const agitating = elapsed > 0 && cycleTime < AGITATION_ALERT_SECONDS;
+    const agitationDetails = currentPhase.agitation ?? getAgitationDescription(currentPhase.agitationMode);
+
+    if (elapsed > 0 && cycleTime === 0) {
+      const cueKey = `${currentPhaseIndex}:${Math.floor(elapsed / agitationInterval)}`;
+
+      if (lastAgitationCueRef.current !== cueKey) {
+        lastAgitationCueRef.current = cueKey;
+        playBeep(440, 0.2); // Agitation start beep
+        if (notificationsEnabled) {
+          showNotification('Agitate now', agitationDetails || undefined);
+        }
       }
     }
-    
+
     setIsAgitating(agitating);
 
-  }, [timeLeft, isActive, currentPhaseIndex, phases, settings]);
+  }, [currentPhaseIndex, isActive, notificationsEnabled, phases, timeLeft]);
 
   const playBeep = (freq: number, duration: number) => {
     if (isMuted) return;
@@ -111,6 +130,8 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
   const toggleTimer = () => setIsActive(!isActive);
   const resetTimer = () => {
     setIsActive(false);
+    setIsAgitating(false);
+    lastAgitationCueRef.current = null;
     setTimeLeft(phases[currentPhaseIndex].duration);
   };
   const skipPhase = () => {
@@ -121,7 +142,8 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
   };
 
   const currentPhase = phases[currentPhaseIndex];
-  const progress = currentPhase ? (timeLeft / currentPhase.duration) * 100 : 0;
+  const progress = currentPhase && currentPhase.duration > 0 ? (timeLeft / currentPhase.duration) * 100 : 0;
+  const agitationDetails = currentPhase?.agitation ?? getAgitationDescription(currentPhase?.agitationMode);
 
   return (
     <div className={cn(
@@ -170,13 +192,13 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
         </div>
       </div>
 
-      {currentPhase?.agitation && (
+      {agitationDetails && (
         <div className={cn(
           "w-full p-3 utilitarian-border transition-colors",
           isAgitating ? "bg-accent-red/10 border-accent-red/50" : "bg-dark-bg border-dark-border"
         )}>
           <p className="mono-label mb-1">Agitation</p>
-          <p className="text-xs text-ui-gray italic leading-relaxed">{currentPhase.agitation}</p>
+          <p className="text-xs text-ui-gray italic leading-relaxed">{agitationDetails}</p>
         </div>
       )}
 
@@ -224,4 +246,3 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     </div>
   );
 };
-

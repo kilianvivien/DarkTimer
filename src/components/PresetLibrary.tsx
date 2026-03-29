@@ -2,6 +2,7 @@ import React from 'react';
 import { Trash2, Play, Clock, Beaker } from 'lucide-react';
 import { Preset, deletePreset } from '../services/presets';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatTemperature, getProcessLabel } from '../services/recipe';
 
 interface PresetLibraryProps {
   presets: Preset[];
@@ -54,8 +55,9 @@ export const PresetLibrary: React.FC<PresetLibraryProps> = ({ presets, onSelect,
                 </div>
                 <div className="flex items-center space-x-1">
                   <Clock size={10} />
-                  <span>{preset.temp}</span>
+                  <span>{formatTemperature(preset.tempC)}</span>
                 </div>
+                <span>{getProcessLabel(preset.processMode)}</span>
               </div>
             </div>
 

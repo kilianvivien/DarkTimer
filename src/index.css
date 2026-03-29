@@ -12,8 +12,16 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-dark-bg text-white font-sans antialiased;
+  }
+
+  #root {
+    min-height: 100vh;
   }
 
   /* Ensure tappable targets meet minimum size on touch devices */

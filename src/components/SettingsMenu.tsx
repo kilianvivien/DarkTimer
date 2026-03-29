@@ -7,6 +7,52 @@ interface SettingsMenuProps {
   onSave: () => void;
 }
 
+interface DurationSettingFieldProps {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}
+
+const DurationSettingField: React.FC<DurationSettingFieldProps> = ({ label, value, onChange }) => {
+  const mins = Math.floor(value / 60);
+  const secs = value % 60;
+
+  const updatePart = (part: 'min' | 'sec', nextValue: number) => {
+    const safeValue = Math.max(0, nextValue);
+    const totalSeconds = part === 'min' ? safeValue * 60 + secs : mins * 60 + Math.min(59, safeValue);
+    onChange(totalSeconds);
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="mono-label">{label}</label>
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-1">
+          <input
+            type="number"
+            value={mins}
+            onChange={(e) => updatePart('min', parseInt(e.target.value) || 0)}
+            className="utilitarian-input w-20 text-center"
+            min="0"
+          />
+          <span className="text-[10px] font-mono text-ui-gray uppercase">m</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <input
+            type="number"
+            value={secs}
+            onChange={(e) => updatePart('sec', parseInt(e.target.value) || 0)}
+            className="utilitarian-input w-20 text-center"
+            min="0"
+            max="59"
+          />
+          <span className="text-[10px] font-mono text-ui-gray uppercase">s</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
   const [settings, setSettings] = useState<UserSettings>(getSettings());
   const [apiKey, setApiKey] = useState(getGeminiApiKey());
@@ -39,62 +85,50 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
       {/* Timer defaults */}
       <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-8">
         <div className="space-y-6">
-          <h2 className="text-xl font-bold uppercase tracking-tight">Default Durations (sec)</h2>
+          <h2 className="text-xl font-bold uppercase tracking-tight">Default Durations</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="mono-label">Stop Bath</label>
-              <input
-                type="number"
-                value={settings.defaultStopBath}
-                onChange={(e) => handleChange('defaultStopBath', parseInt(e.target.value) || 0)}
-                className="utilitarian-input w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="mono-label">Fixer</label>
-              <input
-                type="number"
-                value={settings.defaultFixer}
-                onChange={(e) => handleChange('defaultFixer', parseInt(e.target.value) || 0)}
-                className="utilitarian-input w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="mono-label">Wash</label>
-              <input
-                type="number"
-                value={settings.defaultWash}
-                onChange={(e) => handleChange('defaultWash', parseInt(e.target.value) || 0)}
-                className="utilitarian-input w-full"
-              />
-            </div>
+            <DurationSettingField
+              label="Stop Bath"
+              value={settings.defaultStopBath}
+              onChange={(value) => handleChange('defaultStopBath', value)}
+            />
+            <DurationSettingField
+              label="Fixer"
+              value={settings.defaultFixer}
+              onChange={(value) => handleChange('defaultFixer', value)}
+            />
+            <DurationSettingField
+              label="Wash"
+              value={settings.defaultWash}
+              onChange={(value) => handleChange('defaultWash', value)}
+            />
           </div>
         </div>
 
         <div className="space-y-6 pt-8 border-t border-dark-border">
-          <h2 className="text-xl font-bold uppercase tracking-tight">Agitation Cycle</h2>
+          <h2 className="text-xl font-bold uppercase tracking-tight">Process Defaults (°C)</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="mono-label">Duration (sec)</label>
+              <label className="mono-label">Black &amp; White</label>
               <input
                 type="number"
-                value={settings.agitationDuration}
-                onChange={(e) => handleChange('agitationDuration', parseInt(e.target.value) || 0)}
+                value={settings.defaultBwTempC}
+                onChange={(e) => handleChange('defaultBwTempC', parseFloat(e.target.value) || 0)}
                 className="utilitarian-input w-full"
-                placeholder="e.g. 5"
+                step="0.5"
               />
-              <p className="text-xs text-ui-gray font-mono mt-1">How long to agitate for</p>
+              <p className="text-xs text-ui-gray font-mono mt-1">Used when Manual or AI mode is set to Black &amp; White.</p>
             </div>
             <div className="space-y-1">
-              <label className="mono-label">Interval (sec)</label>
+              <label className="mono-label">Color Negative &amp; Slide</label>
               <input
                 type="number"
-                value={settings.agitationInterval}
-                onChange={(e) => handleChange('agitationInterval', parseInt(e.target.value) || 0)}
+                value={settings.defaultColorTempC}
+                onChange={(e) => handleChange('defaultColorTempC', parseFloat(e.target.value) || 0)}
                 className="utilitarian-input w-full"
-                placeholder="e.g. 60"
+                step="0.5"
               />
-              <p className="text-xs text-ui-gray font-mono mt-1">Frequency of agitation</p>
+              <p className="text-xs text-ui-gray font-mono mt-1">Used when Manual or AI mode is set to Color Negative &amp; Slide.</p>
             </div>
           </div>
         </div>

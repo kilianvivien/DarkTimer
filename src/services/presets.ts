@@ -1,4 +1,4 @@
-import { DevRecipe } from './gemini';
+import { DevRecipe, normalizeRecipe } from './recipe';
 
 export interface Preset extends DevRecipe {
   id: string;
@@ -10,8 +10,22 @@ const STORAGE_KEY = 'darktimer_presets';
 export function getPresets(): Preset[] {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return [];
+
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map((preset) => ({
+      ...normalizeRecipe(preset),
+      id: typeof preset?.id === 'string' ? preset.id : crypto.randomUUID(),
+      createdAt:
+        typeof preset?.createdAt === 'number' && Number.isFinite(preset.createdAt)
+          ? preset.createdAt
+          : Date.now(),
+    }));
   } catch (e) {
     console.error('Failed to parse presets', e);
     return [];
@@ -21,7 +35,7 @@ export function getPresets(): Preset[] {
 export function savePreset(recipe: DevRecipe): Preset {
   const presets = getPresets();
   const newPreset: Preset = {
-    ...recipe,
+    ...normalizeRecipe(recipe),
     id: crypto.randomUUID(),
     createdAt: Date.now(),
   };
