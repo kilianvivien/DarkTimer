@@ -3,7 +3,7 @@
 This document provides a detailed blueprint of the **DarkTimer** application to allow replicating its exact features, architecture, and behavior into a React + Tauri project (with potential mobile app variants). 
 
 ## 1. Overview and Core Concept
-DarkTimer is a "Utilitarian Darkroom Tool" intended for analog photography film development. It combines a manual timer, an AI recipe finder (using Google Gemini), a local recipe library, and customizable defaults into a rugged, minimalist, dark-themed UI.
+DarkTimer is a "Utilitarian Darkroom Tool" intended for analog photography film development. It combines a manual timer, an AI recipe finder (using Gemini or Mistral), a local recipe library, and customizable defaults into a rugged, minimalist, dark-themed UI.
 
 ---
 
@@ -77,10 +77,10 @@ Allows the user to manually build a recipe.
     *   `Start Session`: Directly initializes the Timer view with the current configuration without saving it permanently.
 
 ### B. AI Assistant (`FilmSearch`)
-Queries the Gemini API to find standard times for a given film and developer combination.
+Queries Gemini or Mistral to find standard times for a given film and developer combination.
 *   **Inputs:** Film, Developer, Dilution, ISO, Temp.
 *   **Process:** 
-    *   Calls Gemini API (prompt asks for a structured JSON with max 3 options).
+    *   Calls the selected AI provider (prompt asks for a structured JSON with max 3 options).
     *   Expected phases are Dev, Stop Bath, Fixer, Wash.
 *   **Results List:**
     *   Displays cards with Film name, ISO, Temp, Dev + Dilution, source, and total developer duration.
@@ -95,11 +95,10 @@ Manages locally saved recipes.
 
 ### D. Settings (`SettingsMenu`)
 Configures the App's default behaviors, saved in `localStorage` (`darktimer_settings`).
-*   **Default Durations (sec):** Stop Bath, Fixer, Wash.
-*   **Agitation Cycle:**
-    *   `Duration`: How long to agitate for (e.g., 5s).
-    *   `Interval`: Frequency of agitation (e.g., every 60s).
-*   Saving updates the global state overrides default phase durations in Manual Mode and affects timer calculations globally.
+*   **Development Settings:** Default durations for Stop Bath, Fixer, and Wash plus default temperatures for black and white or color workflows.
+*   **AI Settings:** Default provider selection plus separate Gemini and Mistral API key inputs.
+*   **Notifications:** Browser notification permission and enablement controls.
+*   Saving updates the global state, overrides default phase durations in Manual Mode, and controls which AI provider is selected when opening the AI Assistant.
 
 ---
 

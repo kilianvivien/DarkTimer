@@ -9,7 +9,7 @@ A utilitarian darkroom timer for analog film development. Look up development re
 ## Features
 
 ### AI Recipe Finder
-Query development times for any film/developer combination using Google Gemini. The AI cross-references published data (including the Massive Dev Chart) and returns up to three recipe options with phases, temperatures, and notes. Results are automatically saved to your Library.
+Query development times for any film/developer combination using Gemini or Mistral. The AI cross-references published data (including the Massive Dev Chart) and returns up to three recipe options with phases, temperatures, and notes. Results are automatically saved to your Library.
 
 ### Manual Recipe Builder
 Build fully custom multi-phase development workflows from scratch. Add or remove phases (Developer, Stop Bath, Fixer, Wash, or anything custom), set durations in minutes and seconds, and add per-phase agitation notes.
@@ -27,8 +27,7 @@ Save and reuse your development presets locally. One tap to jump straight into a
 
 ### Settings
 - Default phase durations: Stop Bath, Fixer, Wash
-- Agitation cycle: interval (how often) and duration (how long)
-- Gemini API key management (stored only in your browser's localStorage, never sent to any server)
+- AI provider selection plus Gemini and Mistral API key management (stored only in your browser's localStorage, never sent to any server)
 - Notifications toggle (requires browser permission)
 
 ---
@@ -41,14 +40,14 @@ React 19 · Vite 6 · TypeScript · Tailwind CSS v4 · Framer Motion · Tauri v2
 
 ## Getting Started
 
-**Prerequisites:** Node.js 18+, a [Gemini API key](https://aistudio.google.com/apikey)
+**Prerequisites:** Node.js 18+, plus a [Gemini API key](https://aistudio.google.com/apikey) or [Mistral API key](https://console.mistral.ai/api-keys/)
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000), go to **Settings**, and paste your Gemini API key to enable the AI Assistant. No `.env` file needed — the key is stored in your browser.
+Open [localhost:3000](http://localhost:3000), go to **Settings**, choose your preferred AI provider, and paste your Gemini or Mistral API key to enable the AI Assistant. No `.env` file needed — the keys are stored in your browser.
 
 ### Desktop app (Tauri)
 

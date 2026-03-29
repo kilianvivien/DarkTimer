@@ -143,7 +143,7 @@ export default function App() {
               >
                 <div className="text-center space-y-2">
                   <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">AI Assistant</h1>
-                  <p className="mono-label">Search for recipes using Gemini</p>
+                  <p className="mono-label">Search for recipes using Gemini or Mistral</p>
                 </div>
                 <FilmSearch onRecipeFound={handleStartTimer} onOpenSettings={() => changeView('settings')} />
               </motion.div>
@@ -183,7 +183,7 @@ export default function App() {
               >
                 <div className="text-center space-y-2">
                   <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Settings</h1>
-                  <p className="mono-label">Configure your darkroom defaults</p>
+                  <p className="mono-label">Development, AI, and notification preferences</p>
                 </div>
                 <SettingsMenu onSave={() => changeView('manual')} />
               </motion.div>
@@ -270,7 +270,7 @@ export default function App() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">AI Assistant</p>
-                  <p>Let Gemini suggest development times based on your film, chemistry, process mode, and temperature. Add your Gemini API key in Settings first.</p>
+                  <p>Let Gemini or Mistral suggest development times based on your film, chemistry, process mode, and temperature. Add your API keys in AI Settings first.</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Library</p>
@@ -278,7 +278,7 @@ export default function App() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Settings</p>
-                  <p>Set your default stop bath, fixer, wash, and process temperatures. Paste your Gemini API key to enable the AI Assistant.</p>
+                  <p>Set your development defaults, choose your AI provider, add your API keys, and manage notifications.</p>
                 </div>
               </div>
             </motion.div>

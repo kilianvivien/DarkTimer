@@ -1,15 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, Loader2, Info, Plus, Settings } from 'lucide-react';
-import { getDevTimes, DevResponse } from '../services/gemini';
+import { getDevTimes, DevResponse } from '../services/ai';
 import { AnimatePresence, motion } from 'motion/react';
 import { DevRecipe, ProcessMode, formatTemperature } from '../services/recipe';
 import { savePreset } from '../services/presets';
-import { getDefaultTemperatureForMode, getGeminiApiKey, getSettings } from '../services/settings';
+import {
+  AIProvider,
+  getDefaultTemperatureForMode,
+  getGeminiApiKey,
+  getMistralApiKey,
+  getSettings,
+  saveAiProvider,
+} from '../services/settings';
 import { ProcessModeSwitch } from './ProcessModeSwitch';
 
 interface FilmSearchProps {
   onRecipeFound: (recipe: DevRecipe) => void;
   onOpenSettings: () => void;
+}
+
+const PROVIDER_LABELS: Record<AIProvider, string> = {
+  gemini: 'Gemini',
+  mistral: 'Mistral',
+};
+
+function getApiKeyForProvider(provider: AIProvider): string {
+  return provider === 'mistral' ? getMistralApiKey() : getGeminiApiKey();
 }
 
 export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSettings }) => {
@@ -20,8 +36,10 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
   const [iso, setIso] = useState('400');
   const [processMode, setProcessMode] = useState<ProcessMode>('bw');
   const [tempC, setTempC] = useState(() => getDefaultTemperatureForMode('bw', settings));
+  const [provider, setProvider] = useState<AIProvider>(settings.aiProvider);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DevResponse | null>(null);
+  const [resultProvider, setResultProvider] = useState<AIProvider | null>(null);
   const [error, setError] = useState('');
   const [showMissingKeyWarning, setShowMissingKeyWarning] = useState(false);
   const [isOffline, setIsOffline] = useState(() =>
@@ -47,9 +65,14 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
     setTempC(getDefaultTemperatureForMode(nextMode, settings));
   };
 
+  const handleProviderChange = (nextProvider: AIProvider) => {
+    setProvider(nextProvider);
+    saveAiProvider(nextProvider);
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!getGeminiApiKey().trim()) {
+    if (!getApiKeyForProvider(provider).trim()) {
       setShowMissingKeyWarning(true);
       setError('');
       return;
@@ -66,11 +89,13 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
     setLoading(true);
     setError('');
     setResults(null);
+    setResultProvider(null);
     
-    const response = await getDevTimes(film, developer, iso, tempC, dilution, processMode);
+    const response = await getDevTimes(provider, film, developer, iso, tempC, dilution, processMode);
     
     if (response && response.options.length > 0) {
       setResults(response);
+      setResultProvider(provider);
     } else {
       setError('No recipes found. Try adjusting parameters.');
     }
@@ -91,6 +116,24 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
               className="utilitarian-input w-full"
               step="0.5"
             />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="mono-label">AI Provider</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(['gemini', 'mistral'] as AIProvider[]).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => handleProviderChange(option)}
+                className={`utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest ${
+                  provider === option ? 'bg-white text-black border-white' : ''
+                }`}
+              >
+                {PROVIDER_LABELS[option]}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -164,7 +207,9 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
         >
           <div className="flex items-center space-x-2 text-ui-gray">
             <Info size={12} />
-            <span className="mono-label">Gemini found {results.options.length} options</span>
+            <span className="mono-label">
+              {(resultProvider ? PROVIDER_LABELS[resultProvider] : PROVIDER_LABELS[provider])} found {results.options.length} options
+            </span>
           </div>
           
           <div className="grid grid-cols-1 gap-3">
@@ -221,9 +266,11 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
               onClick={(event) => event.stopPropagation()}
             >
               <div className="space-y-2">
-                <p className="text-white font-mono text-sm uppercase tracking-widest">Gemini API key required</p>
+                <p className="text-white font-mono text-sm uppercase tracking-widest">
+                  {PROVIDER_LABELS[provider]} API key required
+                </p>
                 <p className="text-sm text-ui-gray leading-relaxed">
-                  The AI Assistant needs a Gemini API key before it can look up development times. You can add it in Settings and come straight back here.
+                  The AI Assistant needs a {PROVIDER_LABELS[provider]} API key before it can look up development times. You can add it in AI Settings and come straight back here.
                 </p>
               </div>
 

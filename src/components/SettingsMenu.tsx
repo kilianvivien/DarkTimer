@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { Save, Eye, EyeOff, ExternalLink, Shield, Bell } from 'lucide-react';
-import { UserSettings, getSettings, saveSettings, getGeminiApiKey, saveGeminiApiKey } from '../services/settings';
+import {
+  AIProvider,
+  UserSettings,
+  getGeminiApiKey,
+  getMistralApiKey,
+  getSettings,
+  saveGeminiApiKey,
+  saveMistralApiKey,
+  saveSettings,
+} from '../services/settings';
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../services/notifications';
 
 interface SettingsMenuProps {
@@ -55,11 +64,13 @@ const DurationSettingField: React.FC<DurationSettingFieldProps> = ({ label, valu
 
 export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
   const [settings, setSettings] = useState<UserSettings>(getSettings());
-  const [apiKey, setApiKey] = useState(getGeminiApiKey());
-  const [showKey, setShowKey] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState(getGeminiApiKey());
+  const [mistralApiKey, setMistralApiKey] = useState(getMistralApiKey());
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [showMistralKey, setShowMistralKey] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(notificationPermission());
 
-  const handleChange = (field: keyof UserSettings, value: number | boolean) => {
+  const handleChange = <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
     setSettings({ ...settings, [field]: value });
   };
 
@@ -74,7 +85,8 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     saveSettings(settings);
-    saveGeminiApiKey(apiKey.trim());
+    saveGeminiApiKey(geminiApiKey.trim());
+    saveMistralApiKey(mistralApiKey.trim());
     onSave();
     alert('Settings saved');
   };
@@ -82,10 +94,16 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
   return (
     <form onSubmit={handleSave} className="w-full max-w-xl space-y-8">
 
-      {/* Timer defaults */}
+      {/* Development settings */}
       <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-8">
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold uppercase tracking-tight">Development Settings</h2>
+          <p className="text-[9px] text-ui-gray font-mono uppercase tracking-widest">
+            Default chemistry timings and process temperatures
+          </p>
+        </div>
+
         <div className="space-y-6">
-          <h2 className="text-xl font-bold uppercase tracking-tight">Default Durations</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <DurationSettingField
               label="Stop Bath"
@@ -106,7 +124,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
         </div>
 
         <div className="space-y-6 pt-8 border-t border-dark-border">
-          <h2 className="text-xl font-bold uppercase tracking-tight">Process Defaults (°C)</h2>
+          <h3 className="text-sm font-bold uppercase tracking-widest">Process Temperatures (°C)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="mono-label">Black &amp; White</label>
@@ -134,63 +152,123 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
         </div>
       </div>
 
-      {/* Gemini API Key — separate card */}
+      {/* AI settings */}
       <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-6">
         <div className="space-y-1">
-          <h2 className="text-xl font-bold uppercase tracking-tight">Gemini API Key</h2>
-          <p className="text-[9px] text-ui-gray font-mono uppercase tracking-widest">Required for the AI Assistant</p>
+          <h2 className="text-xl font-bold uppercase tracking-tight">AI Settings</h2>
+          <p className="text-[9px] text-ui-gray font-mono uppercase tracking-widest">
+            Provider selection and API keys for recipe search
+          </p>
         </div>
 
-        <div className="space-y-3 text-xs font-mono text-ui-gray leading-relaxed border border-dark-border p-4">
-          <p className="text-white uppercase tracking-widest text-[9px]">How to get a key</p>
-          <ol className="space-y-1 list-decimal list-inside">
-            <li>Go to Google AI Studio</li>
-            <li>Sign in with your Google account</li>
-            <li>Click <span className="text-white">Get API key</span> {'→'} <span className="text-white">Create API key</span></li>
-            <li>Copy and paste it below</li>
-          </ol>
+        <div className="space-y-2">
+          <label className="mono-label">Default Provider</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(['gemini', 'mistral'] as AIProvider[]).map((provider) => (
+              <button
+                key={provider}
+                type="button"
+                onClick={() => handleChange('aiProvider', provider)}
+                className={`utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest ${
+                  settings.aiProvider === provider ? 'bg-white text-black border-white' : ''
+                }`}
+              >
+                {provider === 'gemini' ? 'Gemini' : 'Mistral'}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-ui-gray font-mono">
+            This sets the default provider used when you open AI search. You can still switch providers directly in the AI screen.
+          </p>
+        </div>
+
+        <div className="space-y-4 border border-dark-border p-4">
+          <div className="space-y-1">
+            <p className="text-white uppercase tracking-widest text-[9px]">Gemini API Key</p>
+            <p className="text-xs font-mono text-ui-gray leading-relaxed">
+              Use Gemini if you want the current Google-based recipe lookup flow.
+            </p>
+          </div>
+          <div className="space-y-1">
+            <label className="mono-label">Gemini Key</label>
+            <div className="flex gap-2">
+              <input
+                type={showGeminiKey ? 'text' : 'password'}
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
+                className="utilitarian-input w-full font-mono"
+                placeholder="AIza..."
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={() => setShowGeminiKey((v) => !v)}
+                className="utilitarian-button px-3 flex items-center"
+                aria-label={showGeminiKey ? 'Hide Gemini key' : 'Show Gemini key'}
+              >
+                {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
           <a
             href="https://aistudio.google.com/apikey"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-accent-red hover:underline mt-1"
+            className="inline-flex items-center gap-1 text-accent-red hover:underline text-xs font-mono"
           >
             Open Google AI Studio <ExternalLink size={10} />
           </a>
         </div>
 
-        <div className="space-y-1">
-          <label className="mono-label">API Key</label>
-          <div className="flex gap-2">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="utilitarian-input w-full font-mono"
-              placeholder="AIza..."
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey(v => !v)}
-              className="utilitarian-button px-3 flex items-center"
-              aria-label={showKey ? 'Hide key' : 'Show key'}
-            >
-              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
+        <div className="space-y-4 border border-dark-border p-4">
+          <div className="space-y-1">
+            <p className="text-white uppercase tracking-widest text-[9px]">Mistral API Key</p>
+            <p className="text-xs font-mono text-ui-gray leading-relaxed">
+              Use Mistral with built-in web search to look up recent film recipes with `mistral-small-latest`.
+            </p>
           </div>
+          <div className="space-y-1">
+            <label className="mono-label">Mistral Key</label>
+            <div className="flex gap-2">
+              <input
+                type={showMistralKey ? 'text' : 'password'}
+                value={mistralApiKey}
+                onChange={(e) => setMistralApiKey(e.target.value)}
+                className="utilitarian-input w-full font-mono"
+                placeholder="..."
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={() => setShowMistralKey((v) => !v)}
+                className="utilitarian-button px-3 flex items-center"
+                aria-label={showMistralKey ? 'Hide Mistral key' : 'Show Mistral key'}
+              >
+                {showMistralKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          <a
+            href="https://console.mistral.ai/api-keys/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-accent-red hover:underline text-xs font-mono"
+          >
+            Open Mistral API Keys <ExternalLink size={10} />
+          </a>
         </div>
 
         <div className="flex items-start gap-2 border border-dark-border p-3">
           <Shield size={12} className="text-ui-gray mt-0.5 shrink-0" />
           <p className="text-[9px] text-ui-gray font-mono leading-relaxed">
-            Your key is stored only in this browser's localStorage and is never sent to any server. API calls go directly from your browser to Google. Clearing your browser data will remove it.
+            Your keys are stored only in this browser&apos;s localStorage and are never sent to any server. API calls go directly from your browser to Google or Mistral. Clearing your browser data will remove them.
           </p>
         </div>
       </div>
 
-      {/* Notifications — separate card */}
+      {/* Notifications */}
       <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-6">
         <div className="space-y-1">
           <h2 className="text-xl font-bold uppercase tracking-tight">Notifications</h2>
@@ -256,7 +334,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
         className="w-full utilitarian-button bg-white text-black font-bold py-4 hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2"
       >
         <Save size={18} />
-        <span>Save Defaults</span>
+        <span>Save Settings</span>
       </button>
     </form>
   );
