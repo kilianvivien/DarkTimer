@@ -39,8 +39,8 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
   return (
     <div className="w-full max-w-2xl space-y-8">
       <form onSubmit={handleSearch} className="space-y-6 utilitarian-border p-6 bg-dark-panel">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="space-y-1">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="space-y-1 col-span-2 md:col-span-1">
             <label className="mono-label">Film</label>
             <input
               type="text"
@@ -50,7 +50,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
               className="utilitarian-input w-full"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 col-span-2 md:col-span-1">
             <label className="mono-label">Developer</label>
             <input
               type="text"
@@ -95,7 +95,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound }) => {
           <button
             type="submit"
             disabled={loading || !film || !developer}
-            className="utilitarian-button bg-white text-black flex items-center space-x-2 disabled:opacity-50"
+            className="w-full sm:w-auto utilitarian-button bg-white text-black flex items-center justify-center space-x-2 disabled:opacity-50"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             <span>Ask AI</span>

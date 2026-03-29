@@ -15,10 +15,16 @@
   body {
     @apply bg-dark-bg text-white font-sans antialiased;
   }
+
+  /* Ensure tappable targets meet minimum size on touch devices */
+  button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 .mono-label {
-  @apply font-mono text-[10px] uppercase tracking-[0.2em] text-ui-gray;
+  @apply font-mono text-xs uppercase tracking-[0.15em] text-ui-gray;
 }
 
 .utilitarian-border {

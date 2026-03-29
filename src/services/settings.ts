@@ -4,6 +4,7 @@ export interface UserSettings {
   defaultWash: number; // seconds
   agitationDuration: number; // seconds (e.g. 5s)
   agitationInterval: number; // seconds (e.g. 60s)
+  notificationsEnabled: boolean;
 }
 
 const STORAGE_KEY = 'darktimer_settings';
@@ -23,6 +24,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   defaultWash: 600,
   agitationDuration: 5,
   agitationInterval: 60,
+  notificationsEnabled: false,
 };
 
 export function getSettings(): UserSettings {

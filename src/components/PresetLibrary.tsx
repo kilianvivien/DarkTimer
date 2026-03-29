@@ -43,11 +43,11 @@ export const PresetLibrary: React.FC<PresetLibraryProps> = ({ presets, onSelect,
                 <h3 className="text-lg font-bold text-white uppercase tracking-tight group-hover:text-accent-red transition-colors">
                   {preset.film}
                 </h3>
-                <span className="px-2 py-0.5 border border-dark-border text-[8px] font-mono text-ui-gray uppercase">
+                <span className="px-2 py-0.5 border border-dark-border text-[10px] font-mono text-ui-gray uppercase">
                   ISO {preset.iso}
                 </span>
               </div>
-              <div className="flex items-center space-x-4 text-[10px] font-mono text-ui-gray uppercase tracking-widest">
+              <div className="flex items-center space-x-4 text-xs font-mono text-ui-gray uppercase tracking-widest">
                 <div className="flex items-center space-x-1">
                   <Beaker size={10} />
                   <span>{preset.developer} ({preset.dilution})</span>
@@ -59,7 +59,7 @@ export const PresetLibrary: React.FC<PresetLibraryProps> = ({ presets, onSelect,
               </div>
             </div>
 
-            <div className="flex items-center space-x-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center space-x-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button
                 onClick={(e) => handleDelete(e, preset.id)}
                 className="p-2 text-ui-gray hover:text-accent-red transition-colors"

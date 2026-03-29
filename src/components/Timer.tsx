@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
 import { DevPhase } from '../services/gemini';
 import { getSettings } from '../services/settings';
+import { showNotification } from '../services/notifications';
 
 interface TimerProps {
   phases: DevPhase[];
@@ -36,9 +37,16 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     } else if (timeLeft === 0 && isActive) {
       playBeep(880, 0.5); // End of phase beep
       if (currentPhaseIndex < phases.length - 1) {
+        const nextPhase = phases[currentPhaseIndex + 1];
+        if (settings.notificationsEnabled) {
+          showNotification(`${phases[currentPhaseIndex].name} complete`, `Next: ${nextPhase.name}`);
+        }
         setCurrentPhaseIndex((prev) => prev + 1);
         setIsActive(false);
       } else {
+        if (settings.notificationsEnabled) {
+          showNotification('Development complete', 'All phases finished.');
+        }
         setIsActive(false);
         onComplete();
       }
@@ -70,6 +78,9 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     
     if (agitating && !isAgitating) {
       playBeep(440, 0.2); // Agitation start beep
+      if (settings.notificationsEnabled) {
+        showNotification('Agitate now', currentPhase.agitation || undefined);
+      }
     }
     
     setIsAgitating(agitating);
@@ -114,7 +125,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
 
   return (
     <div className={cn(
-      "flex flex-col items-center space-y-8 p-10 bg-dark-panel utilitarian-border max-w-md w-full transition-colors duration-500",
+      "flex flex-col items-center space-y-6 md:space-y-8 p-6 md:p-10 bg-dark-panel utilitarian-border max-w-md w-full transition-colors duration-500",
       isAgitating ? "border-accent-red" : "border-dark-border"
     )}>
       <div className="text-center space-y-1">
@@ -144,7 +155,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
         </AnimatePresence>
 
         <div className={cn(
-          "text-8xl font-mono font-bold tabular-nums transition-colors duration-300",
+          "text-6xl md:text-8xl font-mono font-bold tabular-nums transition-colors duration-300",
           isAgitating ? "text-accent-red red-glow" : "text-white"
         )}>
           {formatTime(timeLeft)}
@@ -169,32 +180,32 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
         </div>
       )}
 
-      <div className="flex items-center space-x-4">
-        <button 
+      <div className="flex items-center space-x-3 md:space-x-4">
+        <button
           onClick={() => setIsMuted(!isMuted)}
           className="utilitarian-button p-3"
         >
           {isMuted ? <BellOff size={16} /> : <Bell size={16} />}
         </button>
 
-        <button 
+        <button
           onClick={resetTimer}
           className="utilitarian-button p-3"
         >
           <RotateCcw size={16} />
         </button>
 
-        <button 
+        <button
           onClick={toggleTimer}
           className={cn(
-            "px-8 py-3 font-bold uppercase tracking-widest text-sm transition-all",
+            "px-6 md:px-8 py-3 font-bold uppercase tracking-widest text-sm transition-all",
             isActive ? "bg-dark-border text-white" : "bg-white text-black hover:bg-accent-red hover:text-white"
           )}
         >
           {isActive ? 'Pause' : 'Start'}
         </button>
 
-        <button 
+        <button
           onClick={skipPhase}
           className="utilitarian-button p-3"
         >
@@ -204,7 +215,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
 
       <div className="w-full space-y-2 pt-4 border-t border-dark-border">
         {phases.slice(currentPhaseIndex + 1, currentPhaseIndex + 5).map((phase, i) => (
-          <div key={i} className="flex justify-between items-center text-[10px] font-mono text-ui-gray uppercase">
+          <div key={i} className="flex justify-between items-center text-xs font-mono text-ui-gray uppercase">
             <span>{phase.name}</span>
             <span>{formatTime(phase.duration)}</span>
           </div>

@@ -121,18 +121,29 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
             const secs = phase.duration % 60;
 
             return (
-              <div key={i} className="flex flex-wrap md:flex-nowrap items-center gap-4 p-4 utilitarian-border bg-dark-panel">
-                <div className="flex-1 min-w-[150px]">
-                  <input
-                    type="text"
-                    value={phase.name}
-                    onChange={(e) => updatePhase(i, 'name', e.target.value)}
-                    className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full font-mono text-sm"
-                  />
+              <div key={i} className="p-4 utilitarian-border bg-dark-panel space-y-3 md:space-y-0 md:flex md:flex-nowrap md:items-center md:gap-4">
+                {/* Top row: name + delete */}
+                <div className="flex items-center gap-2 md:contents">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={phase.name}
+                      onChange={(e) => updatePhase(i, 'name', e.target.value)}
+                      className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full font-mono text-sm"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removePhase(i)}
+                    className="text-ui-gray hover:text-accent-red p-1 md:order-last"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                
-                <div className="flex items-center space-x-4">
-                  <div className="flex flex-col items-center">
+
+                {/* Bottom row on mobile: time + agitation */}
+                <div className="flex items-center gap-4 md:contents">
+                  <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1">
                       <input
                         type="number"
@@ -143,8 +154,6 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
                       />
                       <span className="text-[10px] font-mono text-ui-gray uppercase">m</span>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-center">
                     <div className="flex items-center space-x-1">
                       <input
                         type="number"
@@ -157,32 +166,23 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
                       <span className="text-[10px] font-mono text-ui-gray uppercase">s</span>
                     </div>
                   </div>
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={phase.agitation || ''}
+                      placeholder="Agitation notes..."
+                      onChange={(e) => updatePhase(i, 'agitation', e.target.value)}
+                      className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full text-xs text-ui-gray italic"
+                    />
+                  </div>
                 </div>
-
-                <div className="flex-1 min-w-[200px]">
-                  <input
-                    type="text"
-                    value={phase.agitation || ''}
-                    placeholder="Agitation notes..."
-                    onChange={(e) => updatePhase(i, 'agitation', e.target.value)}
-                    className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full text-xs text-ui-gray italic"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => removePhase(i)}
-                  className="text-ui-gray hover:text-accent-red p-1"
-                >
-                  <Trash2 size={14} />
-                </button>
               </div>
             );
           })}
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <button
           type="button"
           onClick={() => {
