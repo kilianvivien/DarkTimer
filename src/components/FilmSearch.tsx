@@ -13,11 +13,14 @@ import {
   saveAiProvider,
 } from '../services/settings';
 import { ProcessModeSwitch } from './ProcessModeSwitch';
+import { TemperatureInput } from './TemperatureInput';
 
 interface FilmSearchProps {
   onRecipeFound: (recipe: DevRecipe) => void;
   onOpenSettings: () => void;
 }
+
+const ISO_OPTIONS = [1, 2, 3, 6, 12, 25, 50, 64, 100, 200, 250, 320, 400, 800, 1600, 3200];
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
   gemini: 'Gemini',
@@ -33,7 +36,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
   const [film, setFilm] = useState('');
   const [developer, setDeveloper] = useState('');
   const [dilution, setDilution] = useState('');
-  const [iso, setIso] = useState('400');
+  const [iso, setIso] = useState(400);
   const [processMode, setProcessMode] = useState<ProcessMode>('bw');
   const [tempC, setTempC] = useState(() => getDefaultTemperatureForMode('bw', settings));
   const [provider, setProvider] = useState<AIProvider>(settings.aiProvider);
@@ -91,7 +94,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
     setResults(null);
     setResultProvider(null);
     
-    const response = await getDevTimes(provider, film, developer, iso, tempC, dilution, processMode);
+    const response = await getDevTimes(provider, film, developer, String(iso), tempC, dilution, processMode);
     
     if (response && response.options.length > 0) {
       setResults(response);
@@ -109,13 +112,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
           <ProcessModeSwitch value={processMode} onChange={handleProcessModeChange} />
           <div className="space-y-1">
             <label className="mono-label">Temperature (°C)</label>
-            <input
-              type="number"
-              value={tempC}
-              onChange={(e) => setTempC(parseFloat(e.target.value) || 0)}
-              className="utilitarian-input w-full"
-              step="0.5"
-            />
+            <TemperatureInput value={tempC} onChange={setTempC} />
           </div>
         </div>
 
@@ -170,13 +167,15 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
           </div>
           <div className="space-y-1">
             <label className="mono-label">ISO</label>
-            <input
-              type="text"
-              placeholder="e.g. 400"
+            <select
               value={iso}
-              onChange={(e) => setIso(e.target.value)}
-              className="utilitarian-input w-full"
-            />
+              onChange={(e) => setIso(parseInt(e.target.value))}
+              className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
+            >
+              {ISO_OPTIONS.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -267,10 +266,10 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
             >
               <div className="space-y-2">
                 <p className="text-white font-mono text-sm uppercase tracking-widest">
-                  {PROVIDER_LABELS[provider]} API key required
+                  Gemini or Mistral API key required
                 </p>
                 <p className="text-sm text-ui-gray leading-relaxed">
-                  The AI Assistant needs a {PROVIDER_LABELS[provider]} API key before it can look up development times. You can add it in AI Settings and come straight back here.
+                  The AI Assistant needs a Gemini or Mistral API key before it can look up development times. Add one in AI Settings and come straight back here.
                 </p>
               </div>
 

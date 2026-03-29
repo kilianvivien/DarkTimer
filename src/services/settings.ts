@@ -2,14 +2,24 @@ import { DEFAULT_BW_TEMP_C, DEFAULT_COLOR_TEMP_C, ProcessMode } from './recipe';
 
 export type AIProvider = 'gemini' | 'mistral';
 
+export type PhaseCountdown = 0 | 5 | 10;
+
 export interface UserSettings {
+  // B&W defaults
+  defaultBwDeveloper: number; // seconds
   defaultStopBath: number; // seconds
   defaultFixer: number; // seconds
   defaultWash: number; // seconds
   defaultBwTempC: number;
+  // Color defaults
+  defaultColorDeveloper: number; // seconds
+  defaultColorBlix: number; // seconds
+  defaultColorWash: number; // seconds
   defaultColorTempC: number;
+  // General
   notificationsEnabled: boolean;
   aiProvider: AIProvider;
+  phaseCountdown: PhaseCountdown;
 }
 
 const STORAGE_KEY = 'darktimer_settings';
@@ -37,13 +47,21 @@ export function saveMistralApiKey(key: string): void {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
+  // B&W
+  defaultBwDeveloper: 360,   // 6:00
   defaultStopBath: 30,
-  defaultFixer: 300,
-  defaultWash: 600,
+  defaultFixer: 300,         // 5:00
+  defaultWash: 600,          // 10:00
   defaultBwTempC: DEFAULT_BW_TEMP_C,
+  // Color
+  defaultColorDeveloper: 210, // 3:30
+  defaultColorBlix: 480,      // 8:00
+  defaultColorWash: 600,      // 10:00
   defaultColorTempC: DEFAULT_COLOR_TEMP_C,
+  // General
   notificationsEnabled: false,
   aiProvider: 'gemini',
+  phaseCountdown: 10,
 };
 
 function clampNumber(value: unknown, fallback: number): number {
@@ -67,8 +85,13 @@ export function getSettings(): UserSettings {
       defaultWash: clampNumber(parsed.defaultWash, DEFAULT_SETTINGS.defaultWash),
       defaultBwTempC: clampNumber(parsed.defaultBwTempC, DEFAULT_SETTINGS.defaultBwTempC),
       defaultColorTempC: clampNumber(parsed.defaultColorTempC, DEFAULT_SETTINGS.defaultColorTempC),
+      defaultBwDeveloper: clampNumber(parsed.defaultBwDeveloper, DEFAULT_SETTINGS.defaultBwDeveloper),
+      defaultColorDeveloper: clampNumber(parsed.defaultColorDeveloper, DEFAULT_SETTINGS.defaultColorDeveloper),
+      defaultColorBlix: clampNumber(parsed.defaultColorBlix, DEFAULT_SETTINGS.defaultColorBlix),
+      defaultColorWash: clampNumber(parsed.defaultColorWash, DEFAULT_SETTINGS.defaultColorWash),
       notificationsEnabled: Boolean(parsed.notificationsEnabled),
       aiProvider: normalizeAIProvider(parsed.aiProvider),
+      phaseCountdown: ([0, 5, 10] as PhaseCountdown[]).includes(parsed.phaseCountdown) ? parsed.phaseCountdown : 10,
     };
   } catch (e) {
     return DEFAULT_SETTINGS;

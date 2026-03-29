@@ -1,5 +1,4 @@
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
 import { ChevronLeft } from 'lucide-react';
 import { DevRecipe, formatTemperature, getProcessLabel } from '../services/recipe';
 import { Timer } from './Timer';
@@ -11,8 +10,10 @@ interface SessionViewProps {
 
 export const SessionView: React.FC<SessionViewProps> = ({ recipe, onExit }) => {
   return (
-    <div className="w-full flex flex-col-reverse md:flex-row gap-6 md:gap-12 items-start justify-center">
-      <div className="flex-1 space-y-4 md:space-y-6 w-full">
+    <div className="w-full flex flex-col landscape:flex-col gap-4 md:gap-8">
+
+      {/* Recipe info — compact strip in landscape, full card in portrait */}
+      <div className="space-y-3 landscape:space-y-0">
         <button
           onClick={onExit}
           className="flex items-center space-x-2 mono-label hover:text-white transition-colors"
@@ -21,20 +22,19 @@ export const SessionView: React.FC<SessionViewProps> = ({ recipe, onExit }) => {
           <span>Exit Session</span>
         </button>
 
-        <div className="bg-dark-panel p-4 md:p-6 utilitarian-border space-y-4 md:space-y-6">
-          <div className="flex justify-between items-start gap-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold text-white uppercase tracking-tight">
+        <div className="bg-dark-panel p-4 utilitarian-border">
+          {/* Always-visible compact row */}
+          <div className="flex justify-between items-center gap-4">
+            <div className="min-w-0">
+              <h2 className="text-base md:text-xl font-bold text-white uppercase tracking-tight truncate">
                 {recipe?.film}
               </h2>
               <p className="text-accent-red font-mono uppercase tracking-widest text-[10px]">
                 {recipe?.developer} • {recipe?.dilution} • ISO {recipe?.iso}
+                {recipe && <span className="text-ui-gray"> • {getProcessLabel(recipe.processMode)}</span>}
               </p>
-              {recipe && (
-                <p className="mono-label mt-2">{getProcessLabel(recipe.processMode)}</p>
-              )}
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0">
               <p className="mono-label">Temp</p>
               <p className="text-lg text-white font-bold font-mono">
                 {recipe ? formatTemperature(recipe.tempC) : ''}
@@ -42,25 +42,19 @@ export const SessionView: React.FC<SessionViewProps> = ({ recipe, onExit }) => {
             </div>
           </div>
 
+          {/* Source + notes hidden in landscape to save vertical space */}
           {recipe?.source && (
-            <div className="pt-4 border-t border-dark-border">
+            <div className="pt-3 mt-3 border-t border-dark-border landscape:hidden">
               <p className="mono-label mb-1">Source</p>
               <p className="text-xs text-ui-gray font-mono">{recipe.source}</p>
             </div>
           )}
 
-          {recipe?.notes && (
-            <div className="pt-4 border-t border-dark-border">
-              <p className="mono-label mb-2">Notes</p>
-              <div className="text-xs text-ui-gray leading-relaxed prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown>{recipe.notes}</ReactMarkdown>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="flex-shrink-0 w-full md:w-auto">
+      {/* Timer — full width */}
+      <div className="w-full">
         <Timer phases={recipe?.phases || []} onComplete={() => {}} />
       </div>
     </div>

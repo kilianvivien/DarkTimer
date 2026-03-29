@@ -9,20 +9,28 @@ import {
   getAgitationLabel,
 } from '../services/recipe';
 import { savePreset } from '../services/presets';
-import { getDefaultTemperatureForMode, getSettings } from '../services/settings';
+import { UserSettings, getDefaultTemperatureForMode, getSettings } from '../services/settings';
 import { ProcessModeSwitch } from './ProcessModeSwitch';
+import { TemperatureInput } from './TemperatureInput';
 
 interface ManualTimerFormProps {
   onStart: (recipe: DevRecipe) => void;
 }
 
 const AGITATION_OPTIONS: AgitationMode[] = ['every-60s', 'every-30s', 'stand'];
+const ISO_OPTIONS = [1, 2, 3, 6, 12, 25, 50, 64, 100, 200, 250, 320, 400, 800, 1600, 3200];
 
-const createDefaultPhases = (): DevPhase[] => [
-  { name: 'Developer', duration: 360, agitationMode: 'every-60s' },
-  { name: 'Stop Bath', duration: 30, agitationMode: 'stand' },
-  { name: 'Fixer', duration: 300, agitationMode: 'every-60s' },
-  { name: 'Wash', duration: 600, agitationMode: 'stand' },
+const createBwPhases = (s: UserSettings): DevPhase[] => [
+  { name: 'Developer', duration: s.defaultBwDeveloper, agitationMode: 'every-60s' },
+  { name: 'Stop Bath', duration: s.defaultStopBath, agitationMode: 'stand' },
+  { name: 'Fixer', duration: s.defaultFixer, agitationMode: 'every-60s' },
+  { name: 'Wash', duration: s.defaultWash, agitationMode: 'stand' },
+];
+
+const createColorPhases = (s: UserSettings): DevPhase[] => [
+  { name: 'Developer', duration: s.defaultColorDeveloper, agitationMode: 'every-60s' },
+  { name: 'Blix', duration: s.defaultColorBlix, agitationMode: 'every-60s' },
+  { name: 'Wash', duration: s.defaultColorWash, agitationMode: 'stand' },
 ];
 
 export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => {
@@ -30,29 +38,15 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
   const [film, setFilm] = useState('');
   const [developer, setDeveloper] = useState('');
   const [dilution, setDilution] = useState('');
+  const [iso, setIso] = useState(400);
   const [processMode, setProcessMode] = useState<ProcessMode>('bw');
   const [tempC, setTempC] = useState(() => getDefaultTemperatureForMode('bw', settings));
-  const [phases, setPhases] = useState<DevPhase[]>(() => {
-    const defaults = createDefaultPhases();
-
-    return defaults.map((phase) => {
-      if (phase.name === 'Stop Bath') {
-        return { ...phase, duration: settings.defaultStopBath };
-      }
-      if (phase.name === 'Fixer') {
-        return { ...phase, duration: settings.defaultFixer };
-      }
-      if (phase.name === 'Wash') {
-        return { ...phase, duration: settings.defaultWash };
-      }
-
-      return phase;
-    });
-  });
+  const [phases, setPhases] = useState<DevPhase[]>(() => createBwPhases(settings));
 
   const handleProcessModeChange = (nextMode: ProcessMode) => {
     setProcessMode(nextMode);
     setTempC(getDefaultTemperatureForMode(nextMode, settings));
+    setPhases(nextMode === 'color' ? createColorPhases(settings) : createBwPhases(settings));
   };
 
   const addPhase = () => {
@@ -113,7 +107,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
     film: film || 'Custom Film',
     developer: developer || 'Custom Dev',
     dilution: dilution || 'N/A',
-    iso: 400,
+    iso,
     tempC,
     processMode,
     phases: phases.map((phase) => {
@@ -140,19 +134,13 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
           <ProcessModeSwitch value={processMode} onChange={handleProcessModeChange} />
           <div className="space-y-1">
             <label className="mono-label">Temperature (°C)</label>
-            <input
-              type="number"
-              value={tempC}
-              onChange={(e) => setTempC(parseFloat(e.target.value) || 0)}
-              className="utilitarian-input w-full"
-              step="0.5"
-            />
+            <TemperatureInput value={tempC} onChange={setTempC} />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-1">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="space-y-1 col-span-2 md:col-span-1">
           <label className="mono-label">Film Stock</label>
           <input
             type="text"
@@ -162,7 +150,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
             className="utilitarian-input w-full"
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 col-span-2 md:col-span-1">
           <label className="mono-label">Developer</label>
           <input
             type="text"
@@ -181,6 +169,18 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
             placeholder="e.g. 1+1"
             className="utilitarian-input w-full"
           />
+        </div>
+        <div className="space-y-1">
+          <label className="mono-label">ISO</label>
+          <select
+            value={iso}
+            onChange={(e) => setIso(parseInt(e.target.value))}
+            className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
+          >
+            {ISO_OPTIONS.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
         </div>
       </div>
 

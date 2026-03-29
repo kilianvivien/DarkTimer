@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Save, Eye, EyeOff, ExternalLink, Shield, Bell } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   AIProvider,
+  PhaseCountdown,
   UserSettings,
   getGeminiApiKey,
   getMistralApiKey,
@@ -35,29 +37,76 @@ const DurationSettingField: React.FC<DurationSettingFieldProps> = ({ label, valu
   return (
     <div className="space-y-2">
       <label className="mono-label">{label}</label>
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-1">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center gap-1 min-w-0">
           <input
             type="number"
             value={mins}
             onChange={(e) => updatePart('min', parseInt(e.target.value) || 0)}
-            className="utilitarian-input w-20 text-center"
+            className="utilitarian-input flex-1 min-w-0 text-center"
             min="0"
           />
-          <span className="text-[10px] font-mono text-ui-gray uppercase">m</span>
+          <span className="text-[10px] font-mono text-ui-gray uppercase shrink-0">m</span>
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center gap-1 min-w-0">
           <input
             type="number"
             value={secs}
             onChange={(e) => updatePart('sec', parseInt(e.target.value) || 0)}
-            className="utilitarian-input w-20 text-center"
+            className="utilitarian-input flex-1 min-w-0 text-center"
             min="0"
             max="59"
           />
-          <span className="text-[10px] font-mono text-ui-gray uppercase">s</span>
+          <span className="text-[10px] font-mono text-ui-gray uppercase shrink-0">s</span>
         </div>
       </div>
+    </div>
+  );
+};
+
+interface CollapsibleSectionProps {
+  title: string;
+  hint?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, hint, defaultOpen = false, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-t border-dark-border">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between py-4 text-left group"
+      >
+        <div className="space-y-0.5">
+          <span className="text-sm font-bold uppercase tracking-widest text-white group-hover:text-white transition-colors">
+            {title}
+          </span>
+          {hint && !open && (
+            <p className="text-[10px] font-mono text-ui-gray uppercase tracking-widest">{hint}</p>
+          )}
+        </div>
+        <span className="font-mono text-ui-gray text-xl leading-none ml-4 shrink-0 group-hover:text-white transition-colors">
+          {open ? '−' : '+'}
+        </span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="pb-6 space-y-4">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -95,16 +144,25 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
     <form onSubmit={handleSave} className="w-full max-w-xl space-y-8">
 
       {/* Development settings */}
-      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-8">
-        <div className="space-y-1">
+      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-2">
+        <div className="space-y-1 pb-2">
           <h2 className="text-xl font-bold uppercase tracking-tight">Development Settings</h2>
-          <p className="text-[9px] text-ui-gray font-mono uppercase tracking-widest">
+          <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
             Default chemistry timings and process temperatures
           </p>
         </div>
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CollapsibleSection
+          title="Black & White"
+          hint="Developer · Stop Bath · Fixer · Wash"
+          defaultOpen={true}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DurationSettingField
+              label="Developer"
+              value={settings.defaultBwDeveloper}
+              onChange={(value) => handleChange('defaultBwDeveloper', value)}
+            />
             <DurationSettingField
               label="Stop Bath"
               value={settings.defaultStopBath}
@@ -121,47 +179,88 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
               onChange={(value) => handleChange('defaultWash', value)}
             />
           </div>
-        </div>
+          <div className="space-y-1">
+            <label className="mono-label">Temperature (°C)</label>
+            <input
+              type="number"
+              value={settings.defaultBwTempC}
+              onChange={(e) => handleChange('defaultBwTempC', parseFloat(e.target.value) || 0)}
+              className="utilitarian-input w-full md:w-40"
+              step="0.5"
+            />
+          </div>
+        </CollapsibleSection>
 
-        <div className="space-y-6 pt-8 border-t border-dark-border">
-          <h3 className="text-sm font-bold uppercase tracking-widest">Process Temperatures (°C)</h3>
+        <CollapsibleSection
+          title="Color Negative & Slide"
+          hint="Developer · Blix · Wash"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="mono-label">Black &amp; White</label>
-              <input
-                type="number"
-                value={settings.defaultBwTempC}
-                onChange={(e) => handleChange('defaultBwTempC', parseFloat(e.target.value) || 0)}
-                className="utilitarian-input w-full"
-                step="0.5"
-              />
-              <p className="text-xs text-ui-gray font-mono mt-1">Used when Manual or AI mode is set to Black &amp; White.</p>
-            </div>
-            <div className="space-y-1">
-              <label className="mono-label">Color Negative &amp; Slide</label>
-              <input
-                type="number"
-                value={settings.defaultColorTempC}
-                onChange={(e) => handleChange('defaultColorTempC', parseFloat(e.target.value) || 0)}
-                className="utilitarian-input w-full"
-                step="0.5"
-              />
-              <p className="text-xs text-ui-gray font-mono mt-1">Used when Manual or AI mode is set to Color Negative &amp; Slide.</p>
-            </div>
+            <DurationSettingField
+              label="Developer"
+              value={settings.defaultColorDeveloper}
+              onChange={(value) => handleChange('defaultColorDeveloper', value)}
+            />
+            <DurationSettingField
+              label="Blix"
+              value={settings.defaultColorBlix}
+              onChange={(value) => handleChange('defaultColorBlix', value)}
+            />
+            <DurationSettingField
+              label="Wash"
+              value={settings.defaultColorWash}
+              onChange={(value) => handleChange('defaultColorWash', value)}
+            />
+          </div>
+          <p className="text-xs text-ui-gray font-mono">Stop bath is not included for color process.</p>
+          <div className="space-y-1">
+            <label className="mono-label">Temperature (°C)</label>
+            <input
+              type="number"
+              value={settings.defaultColorTempC}
+              onChange={(e) => handleChange('defaultColorTempC', parseFloat(e.target.value) || 0)}
+              className="utilitarian-input w-full md:w-40"
+              step="0.5"
+            />
+          </div>
+        </CollapsibleSection>
+
+        <div className="space-y-4 border-t border-dark-border pt-6">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold uppercase tracking-widest">Phase Countdown</h3>
+            <p className="text-xs text-ui-gray font-mono">Delay before each phase starts, with audible beeps.</p>
+          </div>
+          <div className="grid grid-cols-3 border border-dark-border">
+            {([0, 5, 10] as PhaseCountdown[]).map((val, i) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => handleChange('phaseCountdown', val)}
+                className={`px-4 py-3 font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
+                  i < 2 ? 'border-r border-dark-border' : ''
+                } ${
+                  settings.phaseCountdown === val
+                    ? 'bg-white text-black'
+                    : 'text-ui-gray hover:text-white hover:bg-[#0f0f0f]'
+                }`}
+              >
+                {val === 0 ? 'No delay' : `${val} sec`}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {/* AI settings */}
-      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-6">
-        <div className="space-y-1">
+      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-2">
+        <div className="space-y-1 pb-2">
           <h2 className="text-xl font-bold uppercase tracking-tight">AI Settings</h2>
-          <p className="text-[9px] text-ui-gray font-mono uppercase tracking-widest">
+          <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
             Provider selection and API keys for recipe search
           </p>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 border-t border-dark-border pt-4 pb-2">
           <label className="mono-label">Default Provider</label>
           <div className="grid grid-cols-2 gap-2">
             {(['gemini', 'mistral'] as AIProvider[]).map((provider) => (
@@ -182,13 +281,13 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
           </p>
         </div>
 
-        <div className="space-y-4 border border-dark-border p-4">
-          <div className="space-y-1">
-            <p className="text-white uppercase tracking-widest text-[9px]">Gemini API Key</p>
-            <p className="text-xs font-mono text-ui-gray leading-relaxed">
-              Use Gemini if you want the current Google-based recipe lookup flow.
-            </p>
-          </div>
+        <CollapsibleSection
+          title="Gemini API Key"
+          hint={geminiApiKey ? 'Key configured' : 'Not configured'}
+        >
+          <p className="text-xs font-mono text-ui-gray leading-relaxed">
+            Use Gemini if you want the current Google-based recipe lookup flow.
+          </p>
           <div className="space-y-1">
             <label className="mono-label">Gemini Key</label>
             <div className="flex gap-2">
@@ -204,7 +303,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
               <button
                 type="button"
                 onClick={() => setShowGeminiKey((v) => !v)}
-                className="utilitarian-button px-3 flex items-center"
+                className="utilitarian-button px-4 flex items-center justify-center min-w-[44px]"
                 aria-label={showGeminiKey ? 'Hide Gemini key' : 'Show Gemini key'}
               >
                 {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -219,15 +318,15 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
           >
             Open Google AI Studio <ExternalLink size={10} />
           </a>
-        </div>
+        </CollapsibleSection>
 
-        <div className="space-y-4 border border-dark-border p-4">
-          <div className="space-y-1">
-            <p className="text-white uppercase tracking-widest text-[9px]">Mistral API Key</p>
-            <p className="text-xs font-mono text-ui-gray leading-relaxed">
-              Use Mistral with built-in web search to look up recent film recipes with `mistral-small-latest`.
-            </p>
-          </div>
+        <CollapsibleSection
+          title="Mistral API Key"
+          hint={mistralApiKey ? 'Key configured' : 'Not configured'}
+        >
+          <p className="text-xs font-mono text-ui-gray leading-relaxed">
+            Use Mistral with built-in web search to look up recent film recipes with `mistral-small-latest`.
+          </p>
           <div className="space-y-1">
             <label className="mono-label">Mistral Key</label>
             <div className="flex gap-2">
@@ -243,7 +342,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
               <button
                 type="button"
                 onClick={() => setShowMistralKey((v) => !v)}
-                className="utilitarian-button px-3 flex items-center"
+                className="utilitarian-button px-4 flex items-center justify-center min-w-[44px]"
                 aria-label={showMistralKey ? 'Hide Mistral key' : 'Show Mistral key'}
               >
                 {showMistralKey ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -258,11 +357,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
           >
             Open Mistral API Keys <ExternalLink size={10} />
           </a>
-        </div>
+        </CollapsibleSection>
 
-        <div className="flex items-start gap-2 border border-dark-border p-3">
-          <Shield size={12} className="text-ui-gray mt-0.5 shrink-0" />
-          <p className="text-[9px] text-ui-gray font-mono leading-relaxed">
+        <div className="flex items-start gap-3 border border-dark-border p-4 mt-4">
+          <Shield size={14} className="text-ui-gray mt-0.5 shrink-0" />
+          <p className="text-xs text-ui-gray font-mono leading-relaxed">
             Your keys are stored only in this browser&apos;s localStorage and are never sent to any server. API calls go directly from your browser to Google or Mistral. Clearing your browser data will remove them.
           </p>
         </div>
@@ -272,7 +371,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
       <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-6">
         <div className="space-y-1">
           <h2 className="text-xl font-bold uppercase tracking-tight">Notifications</h2>
-          <p className="text-[9px] text-ui-gray font-mono uppercase tracking-widest">Agitation alerts and phase-end events</p>
+          <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">Agitation alerts and phase-end events</p>
         </div>
 
         {!notificationsSupported() ? (
@@ -286,15 +385,15 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
                 type="button"
                 onClick={() => handleChange('notificationsEnabled', !settings.notificationsEnabled)}
                 disabled={permissionStatus !== 'granted'}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                className={`relative inline-flex h-6 w-11 items-center border transition-colors focus:outline-none ${
                   settings.notificationsEnabled && permissionStatus === 'granted'
-                    ? 'bg-accent-red'
-                    : 'bg-dark-border'
+                    ? 'bg-accent-red border-accent-red'
+                    : 'bg-transparent border-dark-border'
                 } disabled:opacity-40`}
                 aria-checked={settings.notificationsEnabled}
                 role="switch"
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                <span className={`inline-block h-4 w-4 transform bg-white transition-transform ${
                   settings.notificationsEnabled && permissionStatus === 'granted' ? 'translate-x-6' : 'translate-x-1'
                 }`} />
               </button>
