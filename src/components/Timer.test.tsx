@@ -86,6 +86,78 @@ describe('Timer', () => {
     expect(showNotificationMock).toHaveBeenCalledWith('Development complete', 'All phases finished.');
   });
 
+  it('falls back to immersive mode on narrow PWAs when native fullscreen is unavailable', async () => {
+    const originalRequestFullscreen = HTMLElement.prototype.requestFullscreen;
+    const originalMatchMedia = window.matchMedia;
+    const originalInnerWidth = window.innerWidth;
+
+    try {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        writable: true,
+        value: 390,
+      });
+
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: query === '(display-mode: standalone)',
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+
+      Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+        configurable: true,
+        writable: true,
+        value: vi.fn(async () => {
+          throw new Error('fullscreen unsupported');
+        }),
+      });
+
+      render(
+        <Timer
+          phases={phases}
+          onComplete={vi.fn()}
+          onExitSession={vi.fn()}
+          settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+        />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+        await Promise.resolve();
+      });
+
+      expect(screen.getByRole('button', { name: /leave fullscreen/i })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /leave fullscreen/i }));
+      expect(screen.queryByRole('button', { name: /leave fullscreen/i })).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        writable: true,
+        value: originalInnerWidth,
+      });
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: originalMatchMedia,
+      });
+      Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+        configurable: true,
+        writable: true,
+        value: originalRequestFullscreen,
+      });
+    }
+  });
+
   it('suppresses audio side effects while muted', async () => {
     const oscillatorStart = vi.fn();
 

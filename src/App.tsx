@@ -223,9 +223,9 @@ export default function App() {
       };
 
   return (
-    <div className="min-h-screen bg-dark-bg text-white flex flex-col font-sans">
+    <div className="min-h-screen min-h-[100dvh] bg-dark-bg text-white flex flex-col font-sans">
       {/* Header */}
-      <header className="border-b border-dark-border bg-dark-bg sticky top-0 z-50">
+      <header className="border-b border-dark-border bg-dark-bg sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div className="max-w-5xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-2 cursor-pointer" onClick={reset}>
             <Camera size={16} className="text-accent-red" />
