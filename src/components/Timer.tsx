@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, SkipForward, Bell, BellOff } from 'lucide-react';
+import { RotateCcw, SkipForward, Bell, BellOff, Minimize, X } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
 import { DevPhase, getAgitationDescription, getAgitationInterval } from '../services/recipe';
@@ -9,10 +9,11 @@ import type { UserSettings } from '../services/userSettings';
 interface TimerProps {
   phases: DevPhase[];
   onComplete: () => void;
+  onExitSession: () => void;
   settings: UserSettings;
 }
 
-export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) => {
+export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession, settings }) => {
   const notificationsEnabled = settings.notificationsEnabled;
   const countdownFrom = settings.phaseCountdown;
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -21,6 +22,9 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
   const [isMuted, setIsMuted] = useState(false);
   const [isAgitating, setIsAgitating] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [flashVisible, setFlashVisible] = useState(false);
+  const [flashKey, setFlashKey] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const isMutedRef = useRef(isMuted);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ownsFullscreenRef = useRef(false);
@@ -31,6 +35,43 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
 
   const AGITATION_ALERT_SECONDS = 5;
   const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
+
+  const getAudioContext = () => {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioCtx) {
+      return null;
+    }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioCtx();
+    }
+
+    return audioContextRef.current;
+  };
+
+  const primeAudio = () => {
+    const ctx = getAudioContext();
+    if (!ctx || ctx.state !== 'suspended') {
+      return;
+    }
+
+    void ctx.resume().catch((error) => {
+      console.error('Failed to resume audio context:', error);
+    });
+  };
+
+  const triggerFlash = () => {
+    if (!settings.agitationFlashEnabled) {
+      return;
+    }
+
+    setFlashVisible(false);
+    setFlashKey((current) => current + 1);
+    setFlashVisible(true);
+  };
 
   const exitFullscreen = async () => {
     if (!ownsFullscreenRef.current || typeof document === 'undefined' || !document.exitFullscreen) {
@@ -68,10 +109,10 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
 
   const playBeep = (freq: number, duration: number) => {
     if (isMutedRef.current) return;
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+    const ctx = getAudioContext();
+    if (!ctx || ctx.state !== 'running') {
+      return;
     }
-    const ctx = audioContextRef.current;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -105,11 +146,23 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
     setIsActive(false);
     setCountdown(null);
     setIsAgitating(false);
+    setFlashVisible(false);
     lastAgitationCueRef.current = null;
   }, [phases]);
 
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+      if (document.fullscreenElement !== containerRef.current) {
+        ownsFullscreenRef.current = false;
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    handleFullscreenChange();
+
     return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
       void exitFullscreen();
     };
   }, []);
@@ -121,6 +174,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
 
     setTimeLeft(phases[currentPhaseIndex].duration);
     setIsAgitating(false);
+    setFlashVisible(false);
     lastAgitationCueRef.current = null;
   }, [phases, currentPhaseIndex]);
 
@@ -180,6 +234,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
 
       if (lastAgitationCueRef.current !== cueKey) {
         lastAgitationCueRef.current = cueKey;
+        triggerFlash();
         playBeep(440, 0.2); // Agitation start beep
         triggerVibration([200, 100, 200]);
         if (notificationsEnabled) {
@@ -198,12 +253,10 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
 
     const playTick = (freq: number, dur: number) => {
       if (isMutedRef.current) return;
-      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) {
+      const ctx = getAudioContext();
+      if (!ctx || ctx.state !== 'running') {
         return;
       }
-      if (!audioContextRef.current) audioContextRef.current = new AudioCtx();
-      const ctx = audioContextRef.current;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'square';
@@ -232,6 +285,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
     if (countdown !== null) {
       setCountdown(null); // cancel pre-start countdown
     } else if (!isActive && timeLeft === phases[currentPhaseIndex]?.duration) {
+      primeAudio();
       void requestFullscreen();
       if (countdownFrom > 0) {
         setCountdown(countdownFrom);
@@ -239,13 +293,24 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
         setIsActive(true);
       }
     } else {
+      primeAudio();
       setIsActive((v) => !v); // pause / resume
     }
   };
+
+  const toggleMute = () => {
+    if (isMuted) {
+      primeAudio();
+    }
+
+    setIsMuted((value) => !value);
+  };
+
   const resetTimer = () => {
     setIsActive(false);
     setCountdown(null);
     setIsAgitating(false);
+    setFlashVisible(false);
     lastAgitationCueRef.current = null;
     setTimeLeft(phases[currentPhaseIndex].duration);
   };
@@ -256,6 +321,19 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
       setCountdown(null);
       setIsAgitating(false);
     }
+  };
+
+  const handleExitSession = async () => {
+    setIsActive(false);
+    setCountdown(null);
+    setIsAgitating(false);
+    setFlashVisible(false);
+    await exitFullscreen();
+    onExitSession();
+  };
+
+  const handleLeaveFullscreen = async () => {
+    await exitFullscreen();
   };
 
   const currentPhase = phases[currentPhaseIndex];
@@ -280,12 +358,14 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
       )}
     >
       <AnimatePresence>
-        {isAgitating && settings.agitationFlashEnabled ? (
+        {flashVisible ? (
           <motion.div
+            key={flashKey}
             initial={{ opacity: 0 }}
-            animate={reduceMotion ? { opacity: 0.16 } : { opacity: [0, 0.18, 0] }}
+            animate={reduceMotion ? { opacity: [0, 0.14, 0] } : { opacity: [0, 0.22, 0] }}
             exit={{ opacity: 0 }}
-            transition={reduceMotion ? { duration: 0.18 } : { duration: 0.75, repeat: Infinity }}
+            transition={{ duration: reduceMotion ? 0.18 : 0.5, ease: 'easeOut' }}
+            onAnimationComplete={() => setFlashVisible(false)}
             className="pointer-events-none absolute inset-0 bg-accent-red"
           />
         ) : null}
@@ -389,7 +469,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
             {countdown !== null ? 'Cancel' : isActive ? 'Pause' : 'Start'}
           </button>
           <div className="flex items-center justify-center landscape:justify-between space-x-3 landscape:space-x-0">
-            <button onClick={() => setIsMuted(!isMuted)} className="utilitarian-button p-3">
+            <button onClick={toggleMute} className="utilitarian-button p-3">
               {isMuted ? <BellOff size={16} /> : <Bell size={16} />}
             </button>
             <button onClick={resetTimer} className="utilitarian-button p-3">
@@ -419,7 +499,34 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) =>
             </div>
           ))}
         </div>
+
       </div>
+
+      {/* Fullscreen floating glass controls — anchored at bottom like the nav bar */}
+      {isFullscreen && (
+        <div className="absolute bottom-0 inset-x-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+          <div className="flex items-center gap-0.5 p-1 rounded-[1.5rem] bg-black/60 backdrop-blur-2xl border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_32px_rgba(0,0,0,0.6)]">
+            <button
+              type="button"
+              onClick={() => void handleLeaveFullscreen()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[1.2rem] font-mono text-[10px] uppercase tracking-widest text-white/45 hover:text-white/75 transition-colors"
+              aria-label="Leave fullscreen"
+            >
+              <Minimize size={12} />
+              <span>Windowed</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExitSession()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[1.2rem] font-mono text-[10px] uppercase tracking-widest text-white/45 hover:text-white/75 transition-colors"
+              aria-label="Exit session"
+            >
+              <X size={12} />
+              <span>Exit</span>
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };

@@ -104,6 +104,7 @@ export const SessionView: React.FC<SessionViewProps> = ({ recipe, onExit, settin
             key={sessionKey}
             phases={recipe.phases}
             onComplete={() => setIsComplete(true)}
+            onExitSession={onExit}
             settings={settings}
           />
         </div>
