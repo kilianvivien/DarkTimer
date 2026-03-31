@@ -372,8 +372,8 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
       </AnimatePresence>
 
       {/* Left / main: phase header + time + progress */}
-      <div className="relative flex flex-col items-center landscape:items-start landscape:justify-center landscape:flex-1 p-6 md:p-10 space-y-6 landscape:space-y-4">
-        <div className="text-center landscape:text-left space-y-1">
+      <div className="relative flex flex-col items-center landscape:justify-center landscape:flex-1 p-6 md:p-10 space-y-6 landscape:space-y-4">
+        <div className="text-center space-y-1">
           <p className="mono-label">
             {countdown !== null ? 'Starting in' : `Phase ${currentPhaseIndex + 1}/${phases.length}`}
           </p>
@@ -387,7 +387,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
           </motion.h1>
         </div>
 
-        <div className="relative flex flex-col items-center landscape:items-start justify-center w-full">
+        <div className="relative flex flex-col items-center justify-center w-full">
           <AnimatePresence>
             {isAgitating && (
               <motion.div

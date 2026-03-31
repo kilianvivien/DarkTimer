@@ -3,13 +3,11 @@ import type { Preset } from '../services/presetTypes';
 import {
   initStorage,
   subscribeToStorage,
-  getStoredApiKeys,
   getStoredPresets,
   getStoredSettings,
-  saveStoredApiKey,
   saveStoredSettings,
 } from '../services/storage';
-import type { AIProvider, UserSettings } from '../services/userSettings';
+import type { UserSettings } from '../services/userSettings';
 
 interface AsyncState<T> {
   data: T;
@@ -91,18 +89,6 @@ export function useStoredPresets(): AsyncState<Preset[]> {
   );
 }
 
-export function useStoredApiKeys(): AsyncState<Record<AIProvider, string>> {
-  return useStoredResource(
-    useCallback(() => getStoredApiKeys(), []),
-    useCallback((listener: () => void) => subscribeToStorage('apiKeys', listener), []),
-    { gemini: '', mistral: '' },
-  );
-}
-
 export function persistSettings(settings: UserSettings): Promise<UserSettings> {
   return saveStoredSettings(settings);
-}
-
-export function persistApiKey(provider: AIProvider, key: string): Promise<void> {
-  return saveStoredApiKey(provider, key);
 }

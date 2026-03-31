@@ -1,6 +1,7 @@
 import type { ProcessMode } from './recipe';
 
 export type AIProvider = 'gemini' | 'mistral';
+export type ApiKeyPersistenceMode = 'session' | 'encrypted';
 
 export type PhaseCountdown = 0 | 5 | 10;
 
@@ -16,6 +17,7 @@ export interface UserSettings {
   defaultColorTempC: number;
   notificationsEnabled: boolean;
   aiProvider: AIProvider;
+  apiKeyPersistenceMode: ApiKeyPersistenceMode;
   phaseCountdown: PhaseCountdown;
   agitationFlashEnabled: boolean;
   agitationVibrationEnabled: boolean;
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   defaultColorTempC: DEFAULT_COLOR_TEMP_C,
   notificationsEnabled: false,
   aiProvider: 'gemini',
+  apiKeyPersistenceMode: 'session',
   phaseCountdown: 10,
   agitationFlashEnabled: true,
   agitationVibrationEnabled: false,
@@ -51,6 +54,10 @@ function clampNumber(value: unknown, fallback: number): number {
 
 export function normalizeAIProvider(value: unknown): AIProvider {
   return value === 'mistral' ? 'mistral' : 'gemini';
+}
+
+export function normalizeApiKeyPersistenceMode(value: unknown): ApiKeyPersistenceMode {
+  return value === 'encrypted' ? 'encrypted' : 'session';
 }
 
 export function normalizeSettings(value: unknown): UserSettings {
@@ -71,6 +78,7 @@ export function normalizeSettings(value: unknown): UserSettings {
     defaultColorWash: clampNumber(parsed.defaultColorWash, DEFAULT_SETTINGS.defaultColorWash),
     notificationsEnabled: Boolean(parsed.notificationsEnabled),
     aiProvider: normalizeAIProvider(parsed.aiProvider),
+    apiKeyPersistenceMode: normalizeApiKeyPersistenceMode(parsed.apiKeyPersistenceMode),
     phaseCountdown: ([0, 5, 10] as PhaseCountdown[]).includes(parsed.phaseCountdown as PhaseCountdown)
       ? (parsed.phaseCountdown as PhaseCountdown)
       : DEFAULT_SETTINGS.phaseCountdown,

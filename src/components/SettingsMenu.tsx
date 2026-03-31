@@ -3,14 +3,27 @@ import { Save, Eye, EyeOff, ExternalLink, Shield, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   AIProvider,
+  ApiKeyPersistenceMode,
   PhaseCountdown,
   UserSettings,
 } from '../services/settings';
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../services/notifications';
 
+export interface SettingsSaveRequest {
+  settings: UserSettings;
+  apiKeys: Record<AIProvider, string>;
+  apiKeysChanged: boolean;
+  passphrase: string;
+  confirmPassphrase: string;
+}
+
 interface SettingsMenuProps {
   apiKeys: Record<AIProvider, string>;
-  onSave: (settings: UserSettings, apiKeys: Record<AIProvider, string>) => Promise<void>;
+  hasEncryptedApiKeys: boolean;
+  isVaultLocked: boolean;
+  onForgetSavedKeys: (settings: UserSettings) => Promise<void>;
+  onSave: (request: SettingsSaveRequest) => Promise<void>;
+  onUnlockSavedKeys: (passphrase: string) => Promise<void>;
   settings: UserSettings;
 }
 
@@ -146,15 +159,33 @@ const PreferenceToggle: React.FC<PreferenceToggleProps> = ({
   );
 };
 
-export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, settings: initialSettings }) => {
+function hasAnyApiKeys(apiKeys: Record<AIProvider, string>): boolean {
+  return Boolean(apiKeys.gemini.trim() || apiKeys.mistral.trim());
+}
+
+export const SettingsMenu: React.FC<SettingsMenuProps> = ({
+  apiKeys,
+  hasEncryptedApiKeys,
+  isVaultLocked,
+  onForgetSavedKeys,
+  onSave,
+  onUnlockSavedKeys,
+  settings: initialSettings,
+}) => {
   const [settings, setSettings] = useState<UserSettings>(initialSettings);
   const [geminiApiKey, setGeminiApiKey] = useState(apiKeys.gemini);
   const [mistralApiKey, setMistralApiKey] = useState(apiKeys.mistral);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showMistralKey, setShowMistralKey] = useState(false);
+  const [securePassphrase, setSecurePassphrase] = useState('');
+  const [securePassphraseConfirm, setSecurePassphraseConfirm] = useState('');
+  const [unlockPassphrase, setUnlockPassphrase] = useState('');
   const [permissionStatus, setPermissionStatus] = useState(notificationPermission());
   const [isSaving, setIsSaving] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isForgettingKeys, setIsForgettingKeys] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [unlockError, setUnlockError] = useState('');
   const vibrationSupported = typeof navigator !== 'undefined' && 'vibrate' in navigator;
 
   useEffect(() => {
@@ -165,6 +196,13 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, set
     setGeminiApiKey(apiKeys.gemini);
     setMistralApiKey(apiKeys.mistral);
   }, [apiKeys.gemini, apiKeys.mistral]);
+
+  useEffect(() => {
+    if (!isVaultLocked) {
+      setUnlockError('');
+      setUnlockPassphrase('');
+    }
+  }, [isVaultLocked]);
 
   const handleChange = <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
     setSettings({ ...settings, [field]: value });
@@ -180,18 +218,91 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, set
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedApiKeys = {
+      gemini: geminiApiKey.trim(),
+      mistral: mistralApiKey.trim(),
+    };
+    const apiKeysChanged =
+      normalizedApiKeys.gemini !== apiKeys.gemini.trim() ||
+      normalizedApiKeys.mistral !== apiKeys.mistral.trim();
+    const shouldRequirePassphrase =
+      settings.apiKeyPersistenceMode === 'encrypted' &&
+      hasAnyApiKeys(normalizedApiKeys) &&
+      (!hasEncryptedApiKeys || apiKeysChanged);
+
+    if (settings.apiKeyPersistenceMode === 'encrypted') {
+      if (shouldRequirePassphrase && !securePassphrase) {
+        setSaveError('Enter a passphrase to securely remember your API keys on this device.');
+        return;
+      }
+
+      if ((securePassphrase || securePassphraseConfirm) && securePassphrase !== securePassphraseConfirm) {
+        setSaveError('Passphrase confirmation does not match.');
+        return;
+      }
+    }
+
     setIsSaving(true);
     setSaveError('');
 
     try {
-      await onSave(settings, {
-        gemini: geminiApiKey,
-        mistral: mistralApiKey,
+      await onSave({
+        settings,
+        apiKeys: normalizedApiKeys,
+        apiKeysChanged,
+        passphrase: securePassphrase,
+        confirmPassphrase: securePassphraseConfirm,
       });
+      setSecurePassphrase('');
+      setSecurePassphraseConfirm('');
     } catch (error) {
-      setSaveError('Settings could not be saved. Please try again.');
+      setSaveError(error instanceof Error ? error.message : 'Settings could not be saved. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!unlockPassphrase) {
+      setUnlockError('Enter your passphrase to unlock the saved API keys.');
+      return;
+    }
+
+    setIsUnlocking(true);
+    setUnlockError('');
+
+    try {
+      await onUnlockSavedKeys(unlockPassphrase);
+      setUnlockPassphrase('');
+    } catch (error) {
+      setUnlockError(error instanceof Error ? error.message : 'Saved keys could not be unlocked.');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  const handleForgetSavedKeys = async () => {
+    setIsForgettingKeys(true);
+    setSaveError('');
+
+    try {
+      const nextSettings = {
+        ...settings,
+        apiKeyPersistenceMode: 'session' as ApiKeyPersistenceMode,
+      };
+
+      await onForgetSavedKeys(nextSettings);
+      setSettings(nextSettings);
+      setGeminiApiKey('');
+      setMistralApiKey('');
+      setSecurePassphrase('');
+      setSecurePassphraseConfirm('');
+      setUnlockPassphrase('');
+      setUnlockError('');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Saved keys could not be forgotten.');
+    } finally {
+      setIsForgettingKeys(false);
     }
   };
 
@@ -332,13 +443,144 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, set
             ))}
           </div>
           <p className="text-xs text-ui-gray font-mono">
-            This sets the default provider used when you open AI search. You can still switch providers directly in the AI screen.
+            Sets the default provider for AI search. You can still switch it in the AI screen.
           </p>
+        </div>
+
+        <div className="space-y-4 border-t border-dark-border pt-6">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold uppercase tracking-widest">API Key Storage</h3>
+            <p className="text-xs text-ui-gray font-mono leading-relaxed">
+              Session-only keeps keys for the current app session. Secure remember saves encrypted keys that you unlock with a passphrase on each launch.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {([
+              {
+                value: 'session',
+                title: 'Session-only',
+                description: 'Keys clear after a full reload or reopen.',
+              },
+              {
+                value: 'encrypted',
+                title: 'Secure remember',
+                description: 'Save encrypted keys on this device and unlock them with a passphrase.',
+              },
+            ] as const).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleChange('apiKeyPersistenceMode', option.value)}
+                className={`text-left border p-4 transition-colors ${
+                  settings.apiKeyPersistenceMode === option.value
+                    ? 'border-white bg-white text-black'
+                    : 'border-dark-border text-white hover:border-white/40'
+                }`}
+              >
+                <p className="text-xs font-mono uppercase tracking-[0.2em]">{option.title}</p>
+                <p className={`mt-2 text-xs leading-relaxed ${
+                  settings.apiKeyPersistenceMode === option.value ? 'text-black/75' : 'text-ui-gray'
+                }`}>
+                  {option.description}
+                </p>
+              </button>
+            ))}
+          </div>
+
+          {settings.apiKeyPersistenceMode === 'encrypted' && (
+            <div className="border border-dark-border p-4 space-y-4">
+              <div className="space-y-1">
+                <p className="mono-label text-white">Secure remember</p>
+                <p className="text-xs text-ui-gray leading-relaxed">
+                  Saved keys stay encrypted until you unlock them for the current session.
+                </p>
+              </div>
+
+              {hasEncryptedApiKeys && isVaultLocked && (
+                <div className="space-y-3 border border-dark-border p-4">
+                  <div className="space-y-1">
+                    <p className="mono-label text-white">Unlock saved keys</p>
+                    <p className="text-xs text-ui-gray leading-relaxed">
+                      Unlock your remembered keys to use or edit them in this session.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="password"
+                      value={unlockPassphrase}
+                      onChange={(event) => setUnlockPassphrase(event.target.value)}
+                      className="utilitarian-input w-full font-mono"
+                      placeholder="Enter passphrase"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleUnlock}
+                      disabled={isUnlocking}
+                      className="utilitarian-button px-4 sm:min-w-[9rem] disabled:opacity-60"
+                    >
+                      {isUnlocking ? 'Unlocking…' : 'Unlock'}
+                    </button>
+                  </div>
+                  {unlockError ? <p className="text-xs font-mono text-accent-red">{unlockError}</p> : null}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="mono-label">Passphrase</label>
+                  <input
+                    type="password"
+                    value={securePassphrase}
+                    onChange={(event) => setSecurePassphrase(event.target.value)}
+                    className="utilitarian-input w-full font-mono"
+                    placeholder={hasEncryptedApiKeys ? 'Only needed to update saved keys' : 'Create a passphrase'}
+                    autoComplete="new-password"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="mono-label">Confirm Passphrase</label>
+                  <input
+                    type="password"
+                    value={securePassphraseConfirm}
+                    onChange={(event) => setSecurePassphraseConfirm(event.target.value)}
+                    className="utilitarian-input w-full font-mono"
+                    placeholder="Confirm passphrase"
+                    autoComplete="new-password"
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-ui-gray font-mono leading-relaxed">
+                Needed when you first save remembered keys, or when you update them later.
+              </p>
+
+              {hasEncryptedApiKeys && (
+                <button
+                  type="button"
+                  onClick={handleForgetSavedKeys}
+                  disabled={isForgettingKeys}
+                  className="utilitarian-button w-full sm:w-auto px-4 py-3 text-xs font-mono uppercase tracking-widest disabled:opacity-60"
+                >
+                  {isForgettingKeys ? 'Forgetting Saved Keys…' : 'Forget Saved Keys'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <CollapsibleSection
           title="Gemini API Key"
-          hint={geminiApiKey ? 'Key configured' : 'Not configured'}
+          hint={
+            settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked
+              ? 'Unlock required'
+              : geminiApiKey
+                ? 'Key configured'
+                : 'Not configured'
+          }
         >
           <p className="text-xs font-mono text-ui-gray leading-relaxed">
             Use Gemini if you want the current Google-based recipe lookup flow.
@@ -351,13 +593,19 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, set
                 value={geminiApiKey}
                 onChange={(e) => setGeminiApiKey(e.target.value)}
                 className="utilitarian-input w-full font-mono"
-                placeholder="AIza..."
+                placeholder={
+                  settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked
+                    ? 'Unlock saved keys to view or edit'
+                    : 'AIza...'
+                }
                 autoComplete="off"
                 spellCheck={false}
+                disabled={settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked}
               />
               <button
                 type="button"
                 onClick={() => setShowGeminiKey((v) => !v)}
+                disabled={settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked}
                 className="utilitarian-button px-4 flex items-center justify-center min-w-[44px]"
                 aria-label={showGeminiKey ? 'Hide Gemini key' : 'Show Gemini key'}
               >
@@ -377,7 +625,13 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, set
 
         <CollapsibleSection
           title="Mistral API Key"
-          hint={mistralApiKey ? 'Key configured' : 'Not configured'}
+          hint={
+            settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked
+              ? 'Unlock required'
+              : mistralApiKey
+                ? 'Key configured'
+                : 'Not configured'
+          }
         >
           <p className="text-xs font-mono text-ui-gray leading-relaxed">
             Use Mistral with built-in web search to look up recent film recipes with `mistral-small-latest`.
@@ -390,13 +644,19 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, set
                 value={mistralApiKey}
                 onChange={(e) => setMistralApiKey(e.target.value)}
                 className="utilitarian-input w-full font-mono"
-                placeholder="..."
+                placeholder={
+                  settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked
+                    ? 'Unlock saved keys to view or edit'
+                    : '...'
+                }
                 autoComplete="off"
                 spellCheck={false}
+                disabled={settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked}
               />
               <button
                 type="button"
                 onClick={() => setShowMistralKey((v) => !v)}
+                disabled={settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked}
                 className="utilitarian-button px-4 flex items-center justify-center min-w-[44px]"
                 aria-label={showMistralKey ? 'Hide Mistral key' : 'Show Mistral key'}
               >
@@ -417,7 +677,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, set
         <div className="flex items-start gap-3 border border-dark-border p-4 mt-4">
           <Shield size={14} className="text-ui-gray mt-0.5 shrink-0" />
           <p className="text-xs text-ui-gray font-mono leading-relaxed">
-            Your keys are stored only on this device in DarkTimer&apos;s local IndexedDB storage and are never sent to any server you do not explicitly call. API requests still go directly from your browser to Google or Mistral.
+            Requests still go directly from your browser to Google or Mistral. Session-only keys are not stored. Remembered keys are stored encrypted.
           </p>
         </div>
       </div>

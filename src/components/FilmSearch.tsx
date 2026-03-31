@@ -13,6 +13,8 @@ import type { AIProvider, UserSettings } from '../services/userSettings';
 
 interface FilmSearchProps {
   apiKeys: Record<AIProvider, string>;
+  hasEncryptedApiKeys: boolean;
+  isVaultLocked: boolean;
   onRecipeFound: (recipe: DevRecipe) => void;
   onOpenSettings: () => void;
   onProviderChange: (provider: AIProvider) => Promise<void>;
@@ -29,6 +31,8 @@ const PROVIDER_LABELS: Record<AIProvider, string> = {
 
 export const FilmSearch: React.FC<FilmSearchProps> = ({
   apiKeys,
+  hasEncryptedApiKeys,
+  isVaultLocked,
   onOpenSettings,
   onProviderChange,
   onRecipeFound,
@@ -87,7 +91,11 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
 
     if (!apiKey) {
       setShowMissingKeyWarning(true);
-      setError('');
+      setError(
+        hasEncryptedApiKeys && isVaultLocked
+          ? 'Unlock your saved API keys in Settings before using AI search.'
+          : '',
+      );
       return;
     }
     if (!film || !developer) {
@@ -326,10 +334,14 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
             >
               <div className="space-y-2">
                 <p className="text-white font-mono text-sm uppercase tracking-widest">
-                  Gemini or Mistral API key required
+                  {hasEncryptedApiKeys && isVaultLocked
+                    ? 'Unlock saved API keys'
+                    : 'Gemini or Mistral API key required'}
                 </p>
                 <p className="text-sm text-ui-gray leading-relaxed">
-                  The AI Assistant needs a Gemini or Mistral API key before it can look up development times. Add one in AI Settings and come straight back here.
+                  {hasEncryptedApiKeys && isVaultLocked
+                    ? 'DarkTimer found securely remembered API keys, but they are still locked for this session. Open Settings to unlock them with your passphrase.'
+                    : 'The AI Assistant needs a Gemini or Mistral API key before it can look up development times. Add one in AI Settings and come straight back here.'}
                 </p>
               </div>
 
@@ -343,7 +355,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
                   className="flex-1 utilitarian-button bg-white text-black hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2"
                 >
                   <Settings size={16} />
-                  <span>Open Settings</span>
+                  <span>{hasEncryptedApiKeys && isVaultLocked ? 'Unlock in Settings' : 'Open Settings'}</span>
                 </button>
                 <button
                   type="button"

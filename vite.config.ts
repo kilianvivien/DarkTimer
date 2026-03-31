@@ -6,9 +6,42 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   const tauriDevHost = process.env.TAURI_DEV_HOST;
+  const contentSecurityPolicy = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://generativelanguage.googleapis.com https://api.mistral.ai https://vitals.vercel-insights.com",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+  ].join('; ');
 
   return {
     plugins: [
+      {
+        name: 'darktimer-csp',
+        apply: 'build',
+        transformIndexHtml(html) {
+          return {
+            html,
+            tags: [
+              {
+                tag: 'meta',
+                attrs: {
+                  'http-equiv': 'Content-Security-Policy',
+                  content: contentSecurityPolicy,
+                },
+                injectTo: 'head-prepend',
+              },
+            ],
+          };
+        },
+      },
       react(),
       tailwindcss(),
       VitePWA({
