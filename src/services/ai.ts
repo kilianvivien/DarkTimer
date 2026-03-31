@@ -8,6 +8,7 @@ export type { DevResponse } from './aiShared';
 
 export async function getDevTimes(
   provider: AIProvider,
+  apiKey: string,
   film: string,
   developer: string,
   iso: string,
@@ -16,8 +17,8 @@ export async function getDevTimes(
   processMode: ProcessMode,
 ): Promise<DevResponse | null> {
   if (provider === 'mistral') {
-    return getMistralDevTimes(film, developer, iso, tempC, dilution, processMode);
+    return getMistralDevTimes(apiKey, film, developer, iso, tempC, dilution, processMode);
   }
 
-  return getGeminiDevTimes(film, developer, iso, tempC, dilution, processMode);
+  return getGeminiDevTimes(apiKey, film, developer, iso, tempC, dilution, processMode);
 }

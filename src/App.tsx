@@ -1,12 +1,22 @@
-import React, { Suspense, lazy, startTransition, useEffect, useState } from 'react';
+import React, { Suspense, lazy, startTransition, useCallback, useEffect, useState } from 'react';
 import { ManualTimerForm } from './components/ManualTimerForm';
 import { DevRecipe } from './services/recipe';
-import { Preset, getPresets } from './services/presets';
+import { deletePreset, savePreset, type Preset } from './services/presets';
 import { Camera, Sparkles, Info, Library, Settings, Sliders, Github } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
+import { DEFAULT_SETTINGS, saveAiProvider, saveGeminiApiKey, saveMistralApiKey, saveSettings } from './services/settings';
+import { useStorageReady, useStoredApiKeys, useStoredPresets, useStoredSettings } from './hooks/useStoredData';
+import type { AIProvider, UserSettings } from './services/userSettings';
 
 type View = 'manual' | 'ai' | 'library' | 'settings' | 'timer';
+type ToastTone = 'success' | 'error';
+
+interface ToastState {
+  id: number;
+  message: string;
+  tone: ToastTone;
+}
 
 const FilmSearch = lazy(() =>
   import('./components/FilmSearch').then((module) => ({ default: module.FilmSearch })),
@@ -27,42 +37,138 @@ const NAV_ITEMS: { view: View; label: string; Icon: React.FC<{ size?: number; cl
   { view: 'library',  label: 'Library',  Icon: Library },
   { view: 'settings', label: 'Settings', Icon: Settings },
 ];
+const SWIPEABLE_VIEWS: View[] = ['manual', 'ai', 'library', 'settings'];
+
+function getViewIndex(view: View): number {
+  return SWIPEABLE_VIEWS.indexOf(view);
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(target.closest('button, a, input, select, textarea, label, [role="button"]'));
+}
 
 export default function App() {
   const [recipe, setRecipe] = useState<DevRecipe | null>(null);
   const [view, setView] = useState<View>('manual');
-  const [presets, setPresets] = useState<Preset[]>([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [navDirection, setNavDirection] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const storageReady = useStorageReady();
+  const { data: settings, isLoading: settingsLoading } = useStoredSettings(DEFAULT_SETTINGS);
+  const { data: presets, isLoading: presetsLoading } = useStoredPresets();
+  const { data: apiKeys, isLoading: apiKeysLoading } = useStoredApiKeys();
+  const appReady = storageReady && !settingsLoading && !presetsLoading && !apiKeysLoading;
+
+  const notify = useCallback((message: string, tone: ToastTone = 'success') => {
+    setToast({
+      id: Date.now(),
+      message,
+      tone,
+    });
+  }, []);
 
   useEffect(() => {
-    if (view === 'library') {
-      setPresets(getPresets());
+    if (!toast) {
+      return;
     }
-  }, [view]);
+
+    const timeout = window.setTimeout(() => {
+      setToast((current) => (current?.id === toast.id ? null : current));
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [toast]);
 
   const handleStartTimer = (newRecipe: DevRecipe) => {
     setRecipe(newRecipe);
+    setNavDirection(1);
     startTransition(() => setView('timer'));
   };
 
   const reset = () => {
     setRecipe(null);
+    setNavDirection(-1);
     startTransition(() => setView('manual'));
   };
 
-  const refreshPresets = () => {
-    setPresets(getPresets());
-  };
-
   const changeView = (nextView: View) => {
-    if (view === 'timer') {
+    if (view === 'timer' || view === nextView) {
       return;
     }
 
+    const currentIndex = getViewIndex(view);
+    const nextIndex = getViewIndex(nextView);
+    setNavDirection(nextIndex > currentIndex ? 1 : -1);
     startTransition(() => setView(nextView));
   };
 
+  const handlePanEnd = (_event: PointerEvent, info: { offset: { x: number }; velocity: { x: number } }) => {
+    if (view === 'timer' || window.innerWidth >= 768) {
+      return;
+    }
+
+    if (Math.abs(info.offset.x) < 60 && Math.abs(info.velocity.x) < 500) {
+      return;
+    }
+
+    const direction = info.offset.x < 0 ? 1 : -1;
+    const currentIndex = getViewIndex(view);
+    const nextIndex = currentIndex + direction;
+    const nextView = SWIPEABLE_VIEWS[nextIndex];
+
+    if (!nextView) {
+      return;
+    }
+
+    changeView(nextView);
+  };
+
+  const handleSavePreset = async (nextRecipe: DevRecipe) => {
+    await savePreset(nextRecipe);
+    notify('Recipe saved to library.');
+  };
+
+  const handleDeletePreset = async (id: string) => {
+    await deletePreset(id);
+    notify('Preset removed from library.');
+  };
+
+  const handleSaveSettings = async (
+    nextSettings: UserSettings,
+    nextApiKeys: Record<AIProvider, string>,
+  ) => {
+    await Promise.all([
+      saveSettings(nextSettings),
+      saveGeminiApiKey(nextApiKeys.gemini.trim()),
+      saveMistralApiKey(nextApiKeys.mistral.trim()),
+    ]);
+    notify('Settings saved.');
+    changeView('manual');
+  };
+
+  const handleProviderChange = async (provider: AIProvider) => {
+    await saveAiProvider(provider);
+  };
+
   const activeView = view === 'timer' ? 'manual' : view;
+  const viewMotion = reduceMotion
+    ? {
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+      }
+    : {
+        initial: { opacity: 0, x: navDirection * 20 },
+        animate: { opacity: 1, x: 0 },
+        exit: { opacity: 0, x: navDirection * -20 },
+      };
 
   return (
     <div className="min-h-screen bg-dark-bg text-white flex flex-col font-sans">
@@ -114,21 +220,35 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center px-4 md:px-6 pt-8 md:pt-12 pb-28 md:pb-8 max-w-5xl mx-auto w-full">
-        <AnimatePresence mode="wait">
+      <motion.main
+        className="flex-1 flex flex-col items-center px-4 md:px-6 pt-8 md:pt-12 pb-40 md:pb-8 max-w-5xl mx-auto w-full"
+        onPanEnd={(event, info) => {
+          if (isInteractiveTarget(event.target)) {
+            return;
+          }
+
+          handlePanEnd(event as PointerEvent, info);
+        }}
+      >
+        {!appReady ? (
+          <ViewLoader label="Loading DarkTimer" detail="Preparing your presets, settings, and secure local storage." />
+        ) : (
+          <AnimatePresence mode="wait">
           {view === 'manual' && (
             <motion.div
               key="manual"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              {...viewMotion}
               className="w-full flex flex-col items-center space-y-6 md:space-y-8"
             >
               <div className="text-center space-y-2">
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Manual Timer</h1>
                 <p className="mono-label">Input your own development parameters</p>
               </div>
-              <ManualTimerForm onStart={handleStartTimer} />
+              <ManualTimerForm
+                onStart={handleStartTimer}
+                onSavePreset={handleSavePreset}
+                settings={settings}
+              />
             </motion.div>
           )}
 
@@ -136,16 +256,21 @@ export default function App() {
             <Suspense fallback={<ViewLoader label="Loading AI assistant" />}>
               <motion.div
                 key="ai"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                {...viewMotion}
                 className="w-full flex flex-col items-center space-y-6 md:space-y-8"
               >
                 <div className="text-center space-y-2">
                   <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">AI Assistant</h1>
                   <p className="mono-label">Search for recipes using Gemini or Mistral</p>
                 </div>
-                <FilmSearch onRecipeFound={handleStartTimer} onOpenSettings={() => changeView('settings')} />
+                <FilmSearch
+                  apiKeys={apiKeys}
+                  onOpenSettings={() => changeView('settings')}
+                  onProviderChange={handleProviderChange}
+                  onRecipeFound={handleStartTimer}
+                  onSavePreset={handleSavePreset}
+                  settings={settings}
+                />
               </motion.div>
             </Suspense>
           )}
@@ -154,9 +279,7 @@ export default function App() {
             <Suspense fallback={<ViewLoader label="Loading library" />}>
               <motion.div
                 key="library"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                {...viewMotion}
                 className="w-full flex flex-col items-center space-y-6 md:space-y-8"
               >
                 <div className="text-center space-y-2">
@@ -166,7 +289,7 @@ export default function App() {
                 <PresetLibrary
                   presets={presets}
                   onSelect={handleStartTimer}
-                  onDelete={refreshPresets}
+                  onDelete={handleDeletePreset}
                 />
               </motion.div>
             </Suspense>
@@ -176,16 +299,18 @@ export default function App() {
             <Suspense fallback={<ViewLoader label="Loading settings" />}>
               <motion.div
                 key="settings"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                {...viewMotion}
                 className="w-full flex flex-col items-center space-y-6 md:space-y-8"
               >
                 <div className="text-center space-y-2">
                   <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Settings</h1>
                   <p className="mono-label">Development, AI, and notification preferences</p>
                 </div>
-                <SettingsMenu onSave={() => changeView('manual')} />
+                <SettingsMenu
+                  apiKeys={apiKeys}
+                  onSave={handleSaveSettings}
+                  settings={settings}
+                />
               </motion.div>
             </Suspense>
           )}
@@ -194,17 +319,18 @@ export default function App() {
             <Suspense fallback={<ViewLoader label="Preparing session" />}>
               <motion.div
                 key="timer"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+                animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
                 className="w-full"
               >
-                <SessionView recipe={recipe} onExit={reset} />
+                <SessionView recipe={recipe} onExit={reset} settings={settings} />
               </motion.div>
             </Suspense>
           )}
-        </AnimatePresence>
-      </main>
+          </AnimatePresence>
+        )}
+      </motion.main>
 
       {/* Desktop footer — hidden on mobile */}
       <footer className="hidden md:block p-6 border-t border-dark-border">
@@ -221,23 +347,28 @@ export default function App() {
       </footer>
 
       {/* Mobile bottom nav bar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-dark-bg border-t border-dark-border pb-[env(safe-area-inset-bottom)]">
-        <div className="flex">
-          {NAV_ITEMS.map(({ view: v, label, Icon }) => (
-            <button
-              key={v}
-              onClick={() => changeView(v)}
-              disabled={view === 'timer'}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 flex-1 py-3 transition-colors",
-                activeView === v ? "text-white" : "text-ui-gray",
-                view === 'timer' && "opacity-30 cursor-not-allowed"
-              )}
-            >
-              <Icon size={20} />
-              <span className="text-[10px] font-mono uppercase tracking-widest">{label}</span>
-            </button>
-          ))}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto max-w-md rounded-[1.6rem] border border-white/[0.07] bg-black/60 shadow-[0_-28px_64px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-2xl">
+          <div className="flex p-1 gap-0.5">
+            {NAV_ITEMS.map(({ view: v, label, Icon }) => (
+              <button
+                key={v}
+                onClick={() => changeView(v)}
+                disabled={view === 'timer'}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1.5 flex-1 px-2 py-2.5 rounded-[1.2rem] transition-all duration-200",
+                  activeView === v
+                    ? "bg-white text-black shadow-[0_2px_12px_rgba(0,0,0,0.3)]"
+                    : "text-white/35 hover:text-white/60",
+                  view === 'timer' && "opacity-30 cursor-not-allowed"
+                )}
+                aria-current={activeView === v ? 'page' : undefined}
+              >
+                <Icon size={19} />
+                <span className="text-[9px] font-mono uppercase tracking-widest leading-none">{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </nav>
 
@@ -248,14 +379,14 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 md:p-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 md:p-6"
             onClick={() => setShowHelp(false)}
           >
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="bg-dark-panel border border-dark-border max-w-md w-full p-6 md:p-8 space-y-6"
+              className="bg-black/70 backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_32px_64px_rgba(0,0,0,0.7)] max-w-md w-full p-6 md:p-8 space-y-6 rounded-2xl"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex justify-between items-start">
@@ -285,14 +416,38 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key={toast.id}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            className="fixed left-4 right-4 top-18 z-[60] md:left-auto md:right-6 md:top-6 md:w-[24rem]"
+          >
+            <div
+              className={cn(
+                'rounded-2xl border px-4 py-3 font-mono text-xs uppercase tracking-[0.18em] shadow-lg',
+                toast.tone === 'error'
+                  ? 'border-accent-red/50 bg-black/75 backdrop-blur-2xl text-white shadow-[inset_0_1px_0_rgba(255,0,0,0.08)]'
+                  : 'border-white/[0.08] bg-black/70 backdrop-blur-2xl text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
+              )}
+            >
+              {toast.message}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function ViewLoader({ label }: { label: string }) {
+function ViewLoader({ label, detail }: { label: string; detail?: string }) {
   return (
-    <div className="w-full max-w-2xl utilitarian-border bg-dark-panel p-8 text-center">
-      <p className="mono-label">{label}</p>
+    <div className="w-full max-w-2xl utilitarian-border bg-dark-panel p-8 text-center space-y-3">
+      <p className="mono-label text-white">{label}</p>
+      {detail ? <p className="text-sm text-ui-gray">{detail}</p> : null}
     </div>
   );
 }

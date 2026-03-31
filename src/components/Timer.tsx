@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RotateCcw, SkipForward, Bell, BellOff } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
 import { DevPhase, getAgitationDescription, getAgitationInterval } from '../services/recipe';
-import { getSettings } from '../services/settings';
 import { showNotification } from '../services/notifications';
+import type { UserSettings } from '../services/userSettings';
 
 interface TimerProps {
   phases: DevPhase[];
   onComplete: () => void;
+  settings: UserSettings;
 }
 
-export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
-  const settings = getSettings();
+export const Timer: React.FC<TimerProps> = ({ phases, onComplete, settings }) => {
   const notificationsEnabled = settings.notificationsEnabled;
-  const COUNTDOWN_FROM = settings.phaseCountdown;
+  const countdownFrom = settings.phaseCountdown;
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(phases[0]?.duration || 0);
   const [isActive, setIsActive] = useState(false);
@@ -22,11 +22,78 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
   const [isAgitating, setIsAgitating] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const isMutedRef = useRef(isMuted);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const ownsFullscreenRef = useRef(false);
+  const reduceMotion = useReducedMotion();
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastAgitationCueRef = useRef<string | null>(null);
 
   const AGITATION_ALERT_SECONDS = 5;
+  const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
+
+  const exitFullscreen = async () => {
+    if (!ownsFullscreenRef.current || typeof document === 'undefined' || !document.exitFullscreen) {
+      ownsFullscreenRef.current = false;
+      return;
+    }
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error('Failed to exit fullscreen:', error);
+    } finally {
+      ownsFullscreenRef.current = false;
+    }
+  };
+
+  const requestFullscreen = async () => {
+    if (
+      typeof document === 'undefined' ||
+      document.fullscreenElement ||
+      !containerRef.current?.requestFullscreen
+    ) {
+      return;
+    }
+
+    try {
+      await containerRef.current.requestFullscreen();
+      ownsFullscreenRef.current = true;
+    } catch (error) {
+      console.error('Failed to enter fullscreen:', error);
+    }
+  };
+
+  const playBeep = (freq: number, duration: number) => {
+    if (isMutedRef.current) return;
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+    }
+    const ctx = audioContextRef.current;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  };
+
+  const triggerVibration = (pattern: number | number[]) => {
+    if (!settings.agitationVibrationEnabled || !canVibrate) {
+      return;
+    }
+
+    navigator.vibrate(pattern);
+  };
 
   useEffect(() => {
     isMutedRef.current = isMuted;
@@ -40,6 +107,12 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     setIsAgitating(false);
     lastAgitationCueRef.current = null;
   }, [phases]);
+
+  useEffect(() => {
+    return () => {
+      void exitFullscreen();
+    };
+  }, []);
 
   useEffect(() => {
     if (!phases[currentPhaseIndex]) {
@@ -65,13 +138,16 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
         if (notificationsEnabled) {
           showNotification(`${phases[currentPhaseIndex].name} complete`, `Next: ${nextPhase.name}`);
         }
+        triggerVibration(120);
         setCurrentPhaseIndex((prev) => prev + 1);
         setIsActive(false);
       } else {
         if (notificationsEnabled) {
           showNotification('Development complete', 'All phases finished.');
         }
+        triggerVibration([160, 120, 220]);
         setIsActive(false);
+        void exitFullscreen();
         onComplete();
       }
     }
@@ -105,6 +181,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
       if (lastAgitationCueRef.current !== cueKey) {
         lastAgitationCueRef.current = cueKey;
         playBeep(440, 0.2); // Agitation start beep
+        triggerVibration([200, 100, 200]);
         if (notificationsEnabled) {
           showNotification('Agitate now', agitationDetails || undefined);
         }
@@ -121,7 +198,10 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
 
     const playTick = (freq: number, dur: number) => {
       if (isMutedRef.current) return;
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) {
+        return;
+      }
       if (!audioContextRef.current) audioContextRef.current = new AudioCtx();
       const ctx = audioContextRef.current;
       const osc = ctx.createOscillator();
@@ -148,34 +228,13 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     return () => clearTimeout(t);
   }, [countdown]);
 
-  const playBeep = (freq: number, duration: number) => {
-    if (isMuted) return;
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    const ctx = audioContextRef.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(0.05, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
-  };
-
   const toggleTimer = () => {
     if (countdown !== null) {
       setCountdown(null); // cancel pre-start countdown
     } else if (!isActive && timeLeft === phases[currentPhaseIndex]?.duration) {
-      // Fresh start for this phase — use countdown if configured
-      if (COUNTDOWN_FROM > 0) {
-        setCountdown(COUNTDOWN_FROM);
+      void requestFullscreen();
+      if (countdownFrom > 0) {
+        setCountdown(countdownFrom);
       } else {
         setIsActive(true);
       }
@@ -194,6 +253,8 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
     if (currentPhaseIndex < phases.length - 1) {
       setCurrentPhaseIndex((prev) => prev + 1);
       setIsActive(false);
+      setCountdown(null);
+      setIsAgitating(false);
     }
   };
 
@@ -202,13 +263,36 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
   const agitationDetails = currentPhase?.agitation ?? getAgitationDescription(currentPhase?.agitationMode);
 
   return (
-    <div className={cn(
-      "flex flex-col landscape:flex-row bg-dark-panel utilitarian-border w-full transition-colors duration-500",
-      isAgitating ? "border-accent-red" : "border-dark-border"
-    )}>
+    <motion.div
+      ref={containerRef}
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.14}
+      whileDrag={reduceMotion ? undefined : { scale: 0.995 }}
+      onDragEnd={(_event, info) => {
+        if (info.offset.x < -90) {
+          skipPhase();
+        }
+      }}
+      className={cn(
+        "relative overflow-hidden flex flex-col landscape:flex-row bg-dark-panel utilitarian-border w-full transition-colors duration-500 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]",
+        isAgitating ? "border-accent-red" : "border-dark-border"
+      )}
+    >
+      <AnimatePresence>
+        {isAgitating && settings.agitationFlashEnabled ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={reduceMotion ? { opacity: 0.16 } : { opacity: [0, 0.18, 0] }}
+            exit={{ opacity: 0 }}
+            transition={reduceMotion ? { duration: 0.18 } : { duration: 0.75, repeat: Infinity }}
+            className="pointer-events-none absolute inset-0 bg-accent-red"
+          />
+        ) : null}
+      </AnimatePresence>
 
       {/* Left / main: phase header + time + progress */}
-      <div className="flex flex-col items-center landscape:items-start landscape:justify-center landscape:flex-1 p-6 md:p-10 space-y-6 landscape:space-y-4">
+      <div className="relative flex flex-col items-center landscape:items-start landscape:justify-center landscape:flex-1 p-6 md:p-10 space-y-6 landscape:space-y-4">
         <div className="text-center landscape:text-left space-y-1">
           <p className="mono-label">
             {countdown !== null ? 'Starting in' : `Phase ${currentPhaseIndex + 1}/${phases.length}`}
@@ -247,8 +331,8 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
                 transition={{ duration: 0.25 }}
                 className={cn(
                   "whitespace-nowrap font-mono font-bold tabular-nums py-3",
-                  "text-[clamp(3.5rem,18vw,6rem)] landscape:text-[clamp(3rem,20vh,6rem)]",
-                  countdown <= 3 ? "text-accent-red red-glow" : "text-white"
+                  "text-[clamp(4.8rem,24vw,8.6rem)] md:text-[clamp(5.8rem,18vw,10rem)] landscape:text-[clamp(4rem,18vh,8rem)]",
+                  countdown <= 3 ? "text-accent-red red-glow-strong" : "text-white"
                 )}
               >
                 {countdown === 0 ? 'GO' : countdown}
@@ -260,9 +344,10 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
                 animate={{ opacity: 1 }}
                 className={cn(
                   "whitespace-nowrap font-mono font-bold tabular-nums transition-colors duration-300 py-3",
-                  "text-[clamp(3.5rem,18vw,6rem)] landscape:text-[clamp(3rem,20vh,6rem)]",
-                  isAgitating ? "text-accent-red red-glow" : "text-white"
+                  "text-[clamp(4.8rem,24vw,8.6rem)] md:text-[clamp(5.8rem,18vw,10rem)] landscape:text-[clamp(4rem,18vh,8rem)]",
+                  isAgitating ? "text-accent-red red-glow-strong" : "text-white"
                 )}
+                aria-live="polite"
               >
                 {formatTime(timeLeft)}
               </motion.div>
@@ -280,7 +365,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
       </div>
 
       {/* Right / sidebar: agitation + controls + upcoming */}
-      <div className="flex flex-col landscape:justify-between landscape:w-56 landscape:border-l landscape:border-dark-border p-6 landscape:p-5 space-y-6 landscape:space-y-4 border-t landscape:border-t-0 border-dark-border">
+      <div className="relative flex flex-col landscape:justify-between landscape:w-64 landscape:border-l landscape:border-dark-border p-6 landscape:p-5 space-y-6 landscape:space-y-4 border-t landscape:border-t-0 border-dark-border">
 
         {agitationDetails && (
           <div className={cn(
@@ -288,7 +373,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
             isAgitating ? "bg-accent-red/10 border-accent-red/50" : "bg-dark-bg border-dark-border"
           )}>
             <p className="mono-label mb-1">Agitation</p>
-            <p className="text-xs text-ui-gray italic leading-relaxed">{agitationDetails}</p>
+            <p className="text-xs text-ui-gray italic leading-relaxed" role="alert">{agitationDetails}</p>
           </div>
         )}
 
@@ -325,7 +410,8 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
           </div>
         </div>
 
-        <div className="space-y-2 pt-4 landscape:pt-0 border-t landscape:border-t-0 border-dark-border landscape:border-none">
+        <div className="space-y-3 pt-4 landscape:pt-0 border-t landscape:border-t-0 border-dark-border landscape:border-none">
+          <p className="mono-label">Swipe left to skip</p>
           {phases.slice(currentPhaseIndex + 1, currentPhaseIndex + 5).map((phase, i) => (
             <div key={i} className="flex justify-between items-center text-xs font-mono text-ui-gray uppercase">
               <span>{phase.name}</span>
@@ -334,6 +420,6 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete }) => {
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };

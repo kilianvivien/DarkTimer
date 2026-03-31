@@ -8,13 +8,15 @@ import {
   getAgitationDescription,
   getAgitationLabel,
 } from '../services/recipe';
-import { savePreset } from '../services/presets';
-import { UserSettings, getDefaultTemperatureForMode, getSettings } from '../services/settings';
+import type { UserSettings } from '../services/userSettings';
+import { getDefaultTemperatureForMode } from '../services/settings';
 import { ProcessModeSwitch } from './ProcessModeSwitch';
 import { TemperatureInput } from './TemperatureInput';
 
 interface ManualTimerFormProps {
   onStart: (recipe: DevRecipe) => void;
+  onSavePreset: (recipe: DevRecipe) => Promise<void>;
+  settings: UserSettings;
 }
 
 const AGITATION_OPTIONS: AgitationMode[] = ['every-60s', 'every-30s', 'stand'];
@@ -33,8 +35,7 @@ const createColorPhases = (s: UserSettings): DevPhase[] => [
   { name: 'Wash', duration: s.defaultColorWash, agitationMode: 'stand' },
 ];
 
-export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => {
-  const settings = getSettings();
+export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSavePreset, settings }) => {
   const [film, setFilm] = useState('');
   const [developer, setDeveloper] = useState('');
   const [dilution, setDilution] = useState('');
@@ -42,6 +43,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
   const [processMode, setProcessMode] = useState<ProcessMode>('bw');
   const [tempC, setTempC] = useState(() => getDefaultTemperatureForMode('bw', settings));
   const [phases, setPhases] = useState<DevPhase[]>(() => createBwPhases(settings));
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
 
   const handleProcessModeChange = (nextMode: ProcessMode) => {
     setProcessMode(nextMode);
@@ -140,7 +142,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="space-y-1 col-span-2 md:col-span-1">
+        <div className="space-y-1 col-span-2 md:col-span-1 min-w-0">
           <label className="mono-label">Film Stock</label>
           <input
             type="text"
@@ -150,7 +152,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
             className="utilitarian-input w-full"
           />
         </div>
-        <div className="space-y-1 col-span-2 md:col-span-1">
+        <div className="space-y-1 col-span-2 md:col-span-1 min-w-0">
           <label className="mono-label">Developer</label>
           <input
             type="text"
@@ -272,13 +274,18 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart }) => 
       <div className="flex flex-col sm:flex-row gap-3">
         <button
           type="button"
-          onClick={() => {
-            savePreset(buildRecipe());
-            alert('Recipe saved to library');
+          disabled={isSavingPreset}
+          onClick={async () => {
+            setIsSavingPreset(true);
+            try {
+              await onSavePreset(buildRecipe());
+            } finally {
+              setIsSavingPreset(false);
+            }
           }}
-          className="flex-1 utilitarian-button py-4 hover:bg-white hover:text-black"
+          className="flex-1 utilitarian-button py-4 hover:bg-white hover:text-black disabled:opacity-60"
         >
-          Save to Library
+          {isSavingPreset ? 'Saving…' : 'Save to Library'}
         </button>
         <button
           type="submit"

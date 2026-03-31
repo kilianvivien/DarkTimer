@@ -1,14 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { getGeminiApiKey } from "./settings";
 import { ProcessMode } from './recipe';
 import { DevResponse, buildRecipeLookupPrompt, parseJsonResponse } from './aiShared';
 
-function getClient(): GoogleGenAI {
-  const key = getGeminiApiKey();
-  return new GoogleGenAI({ apiKey: key });
+function getClient(apiKey: string): GoogleGenAI {
+  return new GoogleGenAI({ apiKey });
 }
 
 export async function getGeminiDevTimes(
+  apiKey: string,
   film: string,
   developer: string,
   iso: string,
@@ -17,7 +16,7 @@ export async function getGeminiDevTimes(
   processMode: ProcessMode,
 ): Promise<DevResponse | null> {
   try {
-    const response = await getClient().models.generateContent({
+    const response = await getClient(apiKey).models.generateContent({
       model: "gemini-3-flash-preview",
       contents: buildRecipeLookupPrompt({
         film,
