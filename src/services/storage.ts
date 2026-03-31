@@ -317,3 +317,23 @@ export async function deleteStoredPreset(id: string): Promise<void> {
   await db.delete('presets', id);
   emit('presets');
 }
+
+export async function __resetStorageForTests(): Promise<void> {
+  listeners.settings.clear();
+  listeners.presets.clear();
+
+  if (dbPromise) {
+    const db = await dbPromise.catch(() => null);
+    db?.close();
+  }
+
+  dbPromise = null;
+  initPromise = null;
+
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+    request.onblocked = () => resolve();
+  });
+}

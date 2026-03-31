@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, SkipForward, Bell, BellOff, Minimize, X } from 'lucide-react';
+import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
 import { DevPhase, getAgitationDescription, getAgitationInterval } from '../services/recipe';
@@ -405,10 +405,10 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
             {countdown !== null ? (
               <motion.div
                 key={countdown}
-                initial={{ scale: 1.4, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.6, opacity: 0 }}
-                transition={{ duration: 0.25 }}
+                initial={{ y: -16, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 16, opacity: 0 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
                 className={cn(
                   "whitespace-nowrap font-mono font-bold tabular-nums py-3",
                   "text-[clamp(4.8rem,24vw,8.6rem)] md:text-[clamp(5.8rem,18vw,10rem)] landscape:text-[clamp(4rem,18vh,8rem)]",
@@ -487,6 +487,15 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
             <button onClick={skipPhase} className="utilitarian-button p-3">
               <SkipForward size={16} />
             </button>
+            {!isFullscreen && (
+              <button
+                onClick={() => void requestFullscreen()}
+                className="utilitarian-button p-3"
+                aria-label="Enter fullscreen"
+              >
+                <Maximize size={16} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -504,7 +513,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
 
       {/* Fullscreen floating glass controls — anchored at bottom like the nav bar */}
       {isFullscreen && (
-        <div className="absolute bottom-0 inset-x-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+        <div className="fixed bottom-0 inset-x-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
           <div className="flex items-center gap-0.5 p-1 rounded-[1.5rem] bg-black/60 backdrop-blur-2xl border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_32px_rgba(0,0,0,0.6)]">
             <button
               type="button"

@@ -294,3 +294,13 @@ export async function clearEncryptedApiKeys(): Promise<void> {
   state.apiKeys = { ...EMPTY_API_KEYS };
   emit();
 }
+
+export function __resetApiKeyStateForTests(): void {
+  initPromise = null;
+  state.apiKeys = { ...EMPTY_API_KEYS };
+  state.hasEncryptedApiKeys = false;
+  state.isLocked = false;
+  state.isReady = false;
+  state.migrationNotice = null;
+  listeners.clear();
+}
