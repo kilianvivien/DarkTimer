@@ -9,3 +9,6 @@ coverage/
 
 # Tauri / Rust
 src-tauri/target/
+
+# Docs (internal planning)
+docs/

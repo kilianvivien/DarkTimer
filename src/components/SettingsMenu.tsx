@@ -1,21 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Save, Eye, EyeOff, ExternalLink, Shield, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   AIProvider,
   PhaseCountdown,
   UserSettings,
-  getGeminiApiKey,
-  getMistralApiKey,
-  getSettings,
-  saveGeminiApiKey,
-  saveMistralApiKey,
-  saveSettings,
 } from '../services/settings';
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../services/notifications';
 
 interface SettingsMenuProps {
-  onSave: () => void;
+  apiKeys: Record<AIProvider, string>;
+  onSave: (settings: UserSettings, apiKeys: Record<AIProvider, string>) => Promise<void>;
+  settings: UserSettings;
 }
 
 interface DurationSettingFieldProps {
@@ -111,13 +107,64 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, hint, de
   );
 };
 
-export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
-  const [settings, setSettings] = useState<UserSettings>(getSettings());
-  const [geminiApiKey, setGeminiApiKey] = useState(getGeminiApiKey());
-  const [mistralApiKey, setMistralApiKey] = useState(getMistralApiKey());
+interface PreferenceToggleProps {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  description: string;
+  onToggle: () => void;
+}
+
+const PreferenceToggle: React.FC<PreferenceToggleProps> = ({
+  checked,
+  disabled = false,
+  label,
+  description,
+  onToggle,
+}) => {
+  return (
+    <div className="flex items-start justify-between gap-4 border border-dark-border p-4">
+      <div className="space-y-1 min-w-0">
+        <p className="mono-label text-white">{label}</p>
+        <p className="text-xs text-ui-gray leading-relaxed">{description}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        className={`relative inline-flex h-6 w-11 items-center border transition-colors focus:outline-none ${
+          checked ? 'bg-accent-red border-accent-red' : 'bg-transparent border-dark-border'
+        } disabled:opacity-40`}
+        aria-checked={checked}
+        role="switch"
+      >
+        <span className={`inline-block h-4 w-4 transform bg-white transition-transform ${
+          checked ? 'translate-x-6' : 'translate-x-1'
+        }`} />
+      </button>
+    </div>
+  );
+};
+
+export const SettingsMenu: React.FC<SettingsMenuProps> = ({ apiKeys, onSave, settings: initialSettings }) => {
+  const [settings, setSettings] = useState<UserSettings>(initialSettings);
+  const [geminiApiKey, setGeminiApiKey] = useState(apiKeys.gemini);
+  const [mistralApiKey, setMistralApiKey] = useState(apiKeys.mistral);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showMistralKey, setShowMistralKey] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState(notificationPermission());
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const vibrationSupported = typeof navigator !== 'undefined' && 'vibrate' in navigator;
+
+  useEffect(() => {
+    setSettings(initialSettings);
+  }, [initialSettings]);
+
+  useEffect(() => {
+    setGeminiApiKey(apiKeys.gemini);
+    setMistralApiKey(apiKeys.mistral);
+  }, [apiKeys.gemini, apiKeys.mistral]);
 
   const handleChange = <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
     setSettings({ ...settings, [field]: value });
@@ -131,13 +178,21 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveSettings(settings);
-    saveGeminiApiKey(geminiApiKey.trim());
-    saveMistralApiKey(mistralApiKey.trim());
-    onSave();
-    alert('Settings saved');
+    setIsSaving(true);
+    setSaveError('');
+
+    try {
+      await onSave(settings, {
+        gemini: geminiApiKey,
+        mistral: mistralApiKey,
+      });
+    } catch (error) {
+      setSaveError('Settings could not be saved. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -362,7 +417,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
         <div className="flex items-start gap-3 border border-dark-border p-4 mt-4">
           <Shield size={14} className="text-ui-gray mt-0.5 shrink-0" />
           <p className="text-xs text-ui-gray font-mono leading-relaxed">
-            Your keys are stored only in this browser&apos;s localStorage and are never sent to any server. API calls go directly from your browser to Google or Mistral. Clearing your browser data will remove them.
+            Your keys are stored only on this device in DarkTimer&apos;s local IndexedDB storage and are never sent to any server you do not explicitly call. API requests still go directly from your browser to Google or Mistral.
           </p>
         </div>
       </div>
@@ -424,16 +479,40 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onSave }) => {
                 Permission granted. Toggle notifications above to enable alerts during timer sessions.
               </p>
             )}
+
+            <div className="space-y-3 border-t border-dark-border pt-4">
+              <p className="text-sm font-bold uppercase tracking-widest">Agitation cues</p>
+              <PreferenceToggle
+                checked={settings.agitationFlashEnabled}
+                label="Flash overlay"
+                description="Pulse the active timer with a restrained red flash during agitation windows."
+                onToggle={() => handleChange('agitationFlashEnabled', !settings.agitationFlashEnabled)}
+              />
+              <PreferenceToggle
+                checked={settings.agitationVibrationEnabled}
+                disabled={!vibrationSupported}
+                label="Vibration cues"
+                description={
+                  vibrationSupported
+                    ? 'Use a short double pulse when agitation starts on supported mobile browsers.'
+                    : 'Vibration is not supported on this device or browser.'
+                }
+                onToggle={() => handleChange('agitationVibrationEnabled', !settings.agitationVibrationEnabled)}
+              />
+            </div>
           </div>
         )}
       </div>
 
+      {saveError ? <p className="text-xs font-mono text-accent-red">{saveError}</p> : null}
+
       <button
         type="submit"
-        className="w-full utilitarian-button bg-white text-black font-bold py-4 hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2"
+        disabled={isSaving}
+        className="w-full utilitarian-button bg-white text-black font-bold py-4 hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2 disabled:opacity-60"
       >
         <Save size={18} />
-        <span>Save Settings</span>
+        <span>{isSaving ? 'Saving Settings…' : 'Save Settings'}</span>
       </button>
     </form>
   );

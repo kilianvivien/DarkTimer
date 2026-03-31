@@ -1,117 +1,60 @@
-import { DEFAULT_BW_TEMP_C, DEFAULT_COLOR_TEMP_C, ProcessMode } from './recipe';
+import {
+  DEFAULT_BW_TEMP_C,
+  DEFAULT_COLOR_TEMP_C,
+  DEFAULT_SETTINGS,
+  getDefaultTemperatureForMode,
+  normalizeAIProvider,
+  normalizeSettings,
+  type AIProvider,
+  type PhaseCountdown,
+  type UserSettings,
+} from './userSettings';
+import {
+  getStoredApiKey,
+  getStoredSettings,
+  saveStoredApiKey,
+  saveStoredSettings,
+} from './storage';
 
-export type AIProvider = 'gemini' | 'mistral';
-
-export type PhaseCountdown = 0 | 5 | 10;
-
-export interface UserSettings {
-  // B&W defaults
-  defaultBwDeveloper: number; // seconds
-  defaultStopBath: number; // seconds
-  defaultFixer: number; // seconds
-  defaultWash: number; // seconds
-  defaultBwTempC: number;
-  // Color defaults
-  defaultColorDeveloper: number; // seconds
-  defaultColorBlix: number; // seconds
-  defaultColorWash: number; // seconds
-  defaultColorTempC: number;
-  // General
-  notificationsEnabled: boolean;
-  aiProvider: AIProvider;
-  phaseCountdown: PhaseCountdown;
-}
-
-const STORAGE_KEY = 'darktimer_settings';
-const GEMINI_KEY_STORAGE = 'darktimer_gemini_key';
-const MISTRAL_KEY_STORAGE = 'darktimer_mistral_key';
-
-function normalizeAIProvider(value: unknown): AIProvider {
-  return value === 'mistral' ? 'mistral' : 'gemini';
-}
-
-export function getGeminiApiKey(): string {
-  return localStorage.getItem(GEMINI_KEY_STORAGE) ?? '';
-}
-
-export function saveGeminiApiKey(key: string): void {
-  localStorage.setItem(GEMINI_KEY_STORAGE, key);
-}
-
-export function getMistralApiKey(): string {
-  return localStorage.getItem(MISTRAL_KEY_STORAGE) ?? '';
-}
-
-export function saveMistralApiKey(key: string): void {
-  localStorage.setItem(MISTRAL_KEY_STORAGE, key);
-}
-
-const DEFAULT_SETTINGS: UserSettings = {
-  // B&W
-  defaultBwDeveloper: 360,   // 6:00
-  defaultStopBath: 30,
-  defaultFixer: 300,         // 5:00
-  defaultWash: 600,          // 10:00
-  defaultBwTempC: DEFAULT_BW_TEMP_C,
-  // Color
-  defaultColorDeveloper: 210, // 3:30
-  defaultColorBlix: 480,      // 8:00
-  defaultColorWash: 600,      // 10:00
-  defaultColorTempC: DEFAULT_COLOR_TEMP_C,
-  // General
-  notificationsEnabled: false,
-  aiProvider: 'gemini',
-  phaseCountdown: 10,
+export type { AIProvider, PhaseCountdown, UserSettings } from './userSettings';
+export {
+  DEFAULT_BW_TEMP_C,
+  DEFAULT_COLOR_TEMP_C,
+  DEFAULT_SETTINGS,
+  getDefaultTemperatureForMode,
+  normalizeAIProvider,
+  normalizeSettings,
 };
 
-function clampNumber(value: unknown, fallback: number): number {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-
-  return fallback;
+export function getGeminiApiKey(): Promise<string> {
+  return getStoredApiKey('gemini');
 }
 
-export function getSettings(): UserSettings {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return DEFAULT_SETTINGS;
-
-  try {
-    const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
-
-    return {
-      defaultStopBath: clampNumber(parsed.defaultStopBath, DEFAULT_SETTINGS.defaultStopBath),
-      defaultFixer: clampNumber(parsed.defaultFixer, DEFAULT_SETTINGS.defaultFixer),
-      defaultWash: clampNumber(parsed.defaultWash, DEFAULT_SETTINGS.defaultWash),
-      defaultBwTempC: clampNumber(parsed.defaultBwTempC, DEFAULT_SETTINGS.defaultBwTempC),
-      defaultColorTempC: clampNumber(parsed.defaultColorTempC, DEFAULT_SETTINGS.defaultColorTempC),
-      defaultBwDeveloper: clampNumber(parsed.defaultBwDeveloper, DEFAULT_SETTINGS.defaultBwDeveloper),
-      defaultColorDeveloper: clampNumber(parsed.defaultColorDeveloper, DEFAULT_SETTINGS.defaultColorDeveloper),
-      defaultColorBlix: clampNumber(parsed.defaultColorBlix, DEFAULT_SETTINGS.defaultColorBlix),
-      defaultColorWash: clampNumber(parsed.defaultColorWash, DEFAULT_SETTINGS.defaultColorWash),
-      notificationsEnabled: Boolean(parsed.notificationsEnabled),
-      aiProvider: normalizeAIProvider(parsed.aiProvider),
-      phaseCountdown: ([0, 5, 10] as PhaseCountdown[]).includes(parsed.phaseCountdown) ? parsed.phaseCountdown : 10,
-    };
-  } catch (e) {
-    return DEFAULT_SETTINGS;
-  }
+export function saveGeminiApiKey(key: string): Promise<void> {
+  return saveStoredApiKey('gemini', key);
 }
 
-export function saveSettings(settings: UserSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+export function getMistralApiKey(): Promise<string> {
+  return getStoredApiKey('mistral');
 }
 
-export function saveAiProvider(aiProvider: AIProvider): void {
-  saveSettings({
-    ...getSettings(),
+export function saveMistralApiKey(key: string): Promise<void> {
+  return saveStoredApiKey('mistral', key);
+}
+
+export function getSettings(): Promise<UserSettings> {
+  return getStoredSettings();
+}
+
+export function saveSettings(settings: UserSettings): Promise<UserSettings> {
+  return saveStoredSettings(settings);
+}
+
+export async function saveAiProvider(aiProvider: AIProvider): Promise<UserSettings> {
+  const settings = await getSettings();
+
+  return saveSettings({
+    ...settings,
     aiProvider,
   });
-}
-
-export function getDefaultTemperatureForMode(
-  mode: ProcessMode,
-  settings: UserSettings = getSettings(),
-): number {
-  return mode === 'bw' ? settings.defaultBwTempC : settings.defaultColorTempC;
 }

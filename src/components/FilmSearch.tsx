@@ -1,23 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Loader2, Info, Plus, Settings } from 'lucide-react';
+import { Sparkles, Loader2, Info, Plus, Settings, Search, CircleAlert } from 'lucide-react';
 import { getDevTimes, DevResponse } from '../services/ai';
 import { AnimatePresence, motion } from 'motion/react';
 import { DevRecipe, ProcessMode, formatTemperature } from '../services/recipe';
-import { savePreset } from '../services/presets';
 import {
-  AIProvider,
   getDefaultTemperatureForMode,
-  getGeminiApiKey,
-  getMistralApiKey,
-  getSettings,
-  saveAiProvider,
 } from '../services/settings';
 import { ProcessModeSwitch } from './ProcessModeSwitch';
 import { TemperatureInput } from './TemperatureInput';
+import { EmptyState } from './EmptyState';
+import type { AIProvider, UserSettings } from '../services/userSettings';
 
 interface FilmSearchProps {
+  apiKeys: Record<AIProvider, string>;
   onRecipeFound: (recipe: DevRecipe) => void;
   onOpenSettings: () => void;
+  onProviderChange: (provider: AIProvider) => Promise<void>;
+  onSavePreset: (recipe: DevRecipe) => Promise<void>;
+  settings: UserSettings;
 }
 
 const ISO_OPTIONS = [1, 2, 3, 6, 12, 25, 50, 64, 100, 200, 250, 320, 400, 800, 1600, 3200];
@@ -27,12 +27,14 @@ const PROVIDER_LABELS: Record<AIProvider, string> = {
   mistral: 'Mistral',
 };
 
-function getApiKeyForProvider(provider: AIProvider): string {
-  return provider === 'mistral' ? getMistralApiKey() : getGeminiApiKey();
-}
-
-export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSettings }) => {
-  const settings = getSettings();
+export const FilmSearch: React.FC<FilmSearchProps> = ({
+  apiKeys,
+  onOpenSettings,
+  onProviderChange,
+  onRecipeFound,
+  onSavePreset,
+  settings,
+}) => {
   const [film, setFilm] = useState('');
   const [developer, setDeveloper] = useState('');
   const [dilution, setDilution] = useState('');
@@ -45,9 +47,15 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
   const [resultProvider, setResultProvider] = useState<AIProvider | null>(null);
   const [error, setError] = useState('');
   const [showMissingKeyWarning, setShowMissingKeyWarning] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [savingRecipeIndex, setSavingRecipeIndex] = useState<number | null>(null);
   const [isOffline, setIsOffline] = useState(() =>
     typeof navigator !== 'undefined' ? !navigator.onLine : false,
   );
+
+  useEffect(() => {
+    setProvider(settings.aiProvider);
+  }, [settings.aiProvider]);
 
   useEffect(() => {
     const syncConnectivity = () => {
@@ -70,12 +78,14 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
 
   const handleProviderChange = (nextProvider: AIProvider) => {
     setProvider(nextProvider);
-    saveAiProvider(nextProvider);
+    void onProviderChange(nextProvider);
   };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!getApiKeyForProvider(provider).trim()) {
+    const apiKey = apiKeys[provider]?.trim() ?? '';
+
+    if (!apiKey) {
       setShowMissingKeyWarning(true);
       setError('');
       return;
@@ -93,8 +103,18 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
     setError('');
     setResults(null);
     setResultProvider(null);
+    setHasSearched(true);
     
-    const response = await getDevTimes(provider, film, developer, String(iso), tempC, dilution, processMode);
+    const response = await getDevTimes(
+      provider,
+      apiKey,
+      film,
+      developer,
+      String(iso),
+      tempC,
+      dilution,
+      processMode,
+    );
     
     if (response && response.options.length > 0) {
       setResults(response);
@@ -198,6 +218,41 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
         {error && <p className="text-[10px] font-mono text-accent-red text-center">{error}</p>}
       </form>
 
+      {loading && (
+        <div className="grid grid-cols-1 gap-3">
+          {[0, 1].map((card) => (
+            <div key={card} className="utilitarian-border bg-dark-panel p-4 space-y-4 animate-pulse">
+              <div className="flex justify-between gap-3">
+                <div className="h-4 w-32 bg-dark-border" />
+                <div className="h-4 w-14 bg-dark-border" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-2/3 bg-dark-border" />
+                <div className="h-3 w-1/3 bg-dark-border" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && !results && !error && !hasSearched && (
+        <EmptyState
+          icon={Search}
+          title="Ask AI for a darkroom starting point"
+          subtitle="Enter a film stock and developer to get structured timing suggestions you can run immediately or save to your library."
+          className="max-w-2xl"
+        />
+      )}
+
+      {!loading && !results && error && (
+        <EmptyState
+          icon={CircleAlert}
+          title="Search unavailable"
+          subtitle={error}
+          className="max-w-2xl"
+        />
+      )}
+
       {results && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
@@ -233,11 +288,16 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
                   </div>
                 </button>
                 <button
-                  onClick={() => {
-                    savePreset(option);
-                    alert('Recipe saved to library');
+                  onClick={async () => {
+                    setSavingRecipeIndex(i);
+                    try {
+                      await onSavePreset(option);
+                    } finally {
+                      setSavingRecipeIndex((current) => (current === i ? null : current));
+                    }
                   }}
-                  className="utilitarian-button px-3 hover:bg-accent-red hover:text-white hover:border-accent-red"
+                  disabled={savingRecipeIndex === i}
+                  className="utilitarian-button px-3 hover:bg-accent-red hover:text-white hover:border-accent-red disabled:opacity-60"
                   title="Save to Library"
                 >
                   <Plus size={16} />
@@ -254,14 +314,14 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({ onRecipeFound, onOpenSet
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 md:p-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 md:p-6"
             onClick={() => setShowMissingKeyWarning(false)}
           >
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="bg-dark-panel border border-dark-border max-w-md w-full p-6 md:p-8 space-y-5"
+              className="bg-black/70 backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_32px_64px_rgba(0,0,0,0.7)] rounded-2xl max-w-md w-full p-6 md:p-8 space-y-5"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="space-y-2">

@@ -1,4 +1,3 @@
-import { getMistralApiKey } from './settings';
 import { ProcessMode } from './recipe';
 import { DevResponse, buildRecipeLookupPrompt, parseJsonResponse } from './aiShared';
 
@@ -35,6 +34,7 @@ function extractMessageText(output: MistralMessageOutput | undefined): string | 
 }
 
 export async function getMistralDevTimes(
+  apiKey: string,
   film: string,
   developer: string,
   iso: string,
@@ -48,7 +48,7 @@ export async function getMistralDevTimes(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${getMistralApiKey()}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: 'mistral-small-latest',
