@@ -5,9 +5,18 @@ import { deletePreset, savePreset, type Preset } from './services/presets';
 import { Camera, Sparkles, Info, Library, Settings, Sliders, Github } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
-import { DEFAULT_SETTINGS, saveAiProvider, saveGeminiApiKey, saveMistralApiKey, saveSettings } from './services/settings';
-import { useStorageReady, useStoredApiKeys, useStoredPresets, useStoredSettings } from './hooks/useStoredData';
+import { DEFAULT_SETTINGS, saveAiProvider, saveSettings } from './services/settings';
+import { useStorageReady, useStoredPresets, useStoredSettings } from './hooks/useStoredData';
+import { useApiKeySession } from './hooks/useApiKeySession';
 import type { AIProvider, UserSettings } from './services/userSettings';
+import {
+  clearEncryptedApiKeys,
+  dismissApiKeyMigrationNotice,
+  saveEncryptedApiKeys,
+  setSessionApiKeys,
+  unlockEncryptedApiKeys,
+} from './services/secretStorage';
+import type { SettingsSaveRequest } from './components/SettingsMenu';
 
 type View = 'manual' | 'ai' | 'library' | 'settings' | 'timer';
 type ToastTone = 'success' | 'error';
@@ -61,8 +70,14 @@ export default function App() {
   const storageReady = useStorageReady();
   const { data: settings, isLoading: settingsLoading } = useStoredSettings(DEFAULT_SETTINGS);
   const { data: presets, isLoading: presetsLoading } = useStoredPresets();
-  const { data: apiKeys, isLoading: apiKeysLoading } = useStoredApiKeys();
-  const appReady = storageReady && !settingsLoading && !presetsLoading && !apiKeysLoading;
+  const {
+    apiKeys,
+    hasEncryptedApiKeys,
+    isLocked: isApiKeyVaultLocked,
+    isReady: apiKeysReady,
+    migrationNotice,
+  } = useApiKeySession();
+  const appReady = storageReady && !settingsLoading && !presetsLoading && apiKeysReady;
 
   const notify = useCallback((message: string, tone: ToastTone = 'success') => {
     setToast({
@@ -85,6 +100,15 @@ export default function App() {
       window.clearTimeout(timeout);
     };
   }, [toast]);
+
+  useEffect(() => {
+    if (!migrationNotice) {
+      return;
+    }
+
+    notify(migrationNotice);
+    dismissApiKeyMigrationNotice();
+  }, [migrationNotice, notify]);
 
   const handleStartTimer = (newRecipe: DevRecipe) => {
     setRecipe(newRecipe);
@@ -140,17 +164,45 @@ export default function App() {
     notify('Preset removed from library.');
   };
 
-  const handleSaveSettings = async (
-    nextSettings: UserSettings,
-    nextApiKeys: Record<AIProvider, string>,
-  ) => {
-    await Promise.all([
-      saveSettings(nextSettings),
-      saveGeminiApiKey(nextApiKeys.gemini.trim()),
-      saveMistralApiKey(nextApiKeys.mistral.trim()),
-    ]);
+  const handleSaveSettings = async ({
+    settings: nextSettings,
+    apiKeys: nextApiKeys,
+    apiKeysChanged,
+    passphrase,
+  }: SettingsSaveRequest) => {
+    const normalizedApiKeys = {
+      gemini: nextApiKeys.gemini.trim(),
+      mistral: nextApiKeys.mistral.trim(),
+    };
+
+    await saveSettings(nextSettings);
+
+    if (nextSettings.apiKeyPersistenceMode === 'session') {
+      await clearEncryptedApiKeys();
+      await setSessionApiKeys(normalizedApiKeys);
+    } else if (apiKeysChanged || !hasEncryptedApiKeys) {
+      if (!passphrase && (normalizedApiKeys.gemini || normalizedApiKeys.mistral)) {
+        throw new Error('Enter your passphrase to securely remember updated API keys.');
+      }
+
+      await saveEncryptedApiKeys(passphrase, normalizedApiKeys);
+    }
+
     notify('Settings saved.');
     changeView('manual');
+  };
+
+  const handleUnlockSavedKeys = async (passphrase: string) => {
+    await unlockEncryptedApiKeys(passphrase);
+    notify('Saved API keys unlocked for this session.');
+  };
+
+  const handleForgetSavedKeys = async (nextSettings: UserSettings) => {
+    await Promise.all([
+      saveSettings(nextSettings),
+      clearEncryptedApiKeys(),
+    ]);
+    notify('Saved API keys were removed from this device.');
   };
 
   const handleProviderChange = async (provider: AIProvider) => {
@@ -265,6 +317,8 @@ export default function App() {
                 </div>
                 <FilmSearch
                   apiKeys={apiKeys}
+                  hasEncryptedApiKeys={hasEncryptedApiKeys}
+                  isVaultLocked={isApiKeyVaultLocked}
                   onOpenSettings={() => changeView('settings')}
                   onProviderChange={handleProviderChange}
                   onRecipeFound={handleStartTimer}
@@ -308,7 +362,11 @@ export default function App() {
                 </div>
                 <SettingsMenu
                   apiKeys={apiKeys}
+                  hasEncryptedApiKeys={hasEncryptedApiKeys}
+                  isVaultLocked={isApiKeyVaultLocked}
+                  onForgetSavedKeys={handleForgetSavedKeys}
                   onSave={handleSaveSettings}
+                  onUnlockSavedKeys={handleUnlockSavedKeys}
                   settings={settings}
                 />
               </motion.div>

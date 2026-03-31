@@ -9,15 +9,16 @@ import {
 } from './userSettings';
 
 const DB_NAME = 'darktimer-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SETTINGS_KEY = 'user';
+const ENCRYPTED_API_VAULT_KEY = 'apiKeys';
 
 const LEGACY_SETTINGS_KEY = 'darktimer_settings';
 const LEGACY_PRESETS_KEY = 'darktimer_presets';
 const LEGACY_GEMINI_KEY = 'darktimer_gemini_key';
 const LEGACY_MISTRAL_KEY = 'darktimer_mistral_key';
 
-type StorageTopic = 'settings' | 'presets' | 'apiKeys';
+type StorageTopic = 'settings' | 'presets';
 
 interface SettingsRecord {
   key: typeof SETTINGS_KEY;
@@ -27,6 +28,15 @@ interface SettingsRecord {
 interface ApiKeyRecord {
   provider: AIProvider;
   key: string;
+}
+
+export interface EncryptedApiKeyVaultRecord {
+  version: number;
+  kdf: 'PBKDF2-SHA-256';
+  iterations: number;
+  salt: string;
+  iv: string;
+  ciphertext: string;
 }
 
 interface SessionRecord {
@@ -66,12 +76,15 @@ interface DarkTimerDB extends DBSchema {
     key: string;
     value: ApiKeyRecord;
   };
+  secureVault: {
+    key: string;
+    value: EncryptedApiKeyVaultRecord;
+  };
 }
 
 const listeners: Record<StorageTopic, Set<() => void>> = {
   settings: new Set(),
   presets: new Set(),
-  apiKeys: new Set(),
 };
 
 let dbPromise: Promise<IDBPDatabase<DarkTimerDB>> | null = null;
@@ -100,6 +113,10 @@ function getDb(): Promise<IDBPDatabase<DarkTimerDB>> {
 
         if (!db.objectStoreNames.contains('apiKeys')) {
           db.createObjectStore('apiKeys', { keyPath: 'provider' });
+        }
+
+        if (!db.objectStoreNames.contains('secureVault')) {
+          db.createObjectStore('secureVault');
         }
       },
     });
@@ -143,16 +160,14 @@ async function migrateLegacyStorage(): Promise<void> {
 
   const legacySettings = localStorage.getItem(LEGACY_SETTINGS_KEY);
   const legacyPresets = localStorage.getItem(LEGACY_PRESETS_KEY);
-  const legacyGeminiKey = localStorage.getItem(LEGACY_GEMINI_KEY);
-  const legacyMistralKey = localStorage.getItem(LEGACY_MISTRAL_KEY);
 
-  if (!legacySettings && !legacyPresets && !legacyGeminiKey && !legacyMistralKey) {
+  if (!legacySettings && !legacyPresets) {
     return;
   }
 
   try {
     const db = await getDb();
-    const tx = db.transaction(['settings', 'presets', 'apiKeys'], 'readwrite');
+    const tx = db.transaction(['settings', 'presets'], 'readwrite');
 
     if (legacySettings) {
       tx.objectStore('settings').put({
@@ -170,20 +185,10 @@ async function migrateLegacyStorage(): Promise<void> {
       }
     }
 
-    if (legacyGeminiKey !== null) {
-      tx.objectStore('apiKeys').put({ provider: 'gemini', key: legacyGeminiKey });
-    }
-
-    if (legacyMistralKey !== null) {
-      tx.objectStore('apiKeys').put({ provider: 'mistral', key: legacyMistralKey });
-    }
-
     await tx.done;
 
     localStorage.removeItem(LEGACY_SETTINGS_KEY);
     localStorage.removeItem(LEGACY_PRESETS_KEY);
-    localStorage.removeItem(LEGACY_GEMINI_KEY);
-    localStorage.removeItem(LEGACY_MISTRAL_KEY);
   } catch (error) {
     console.error('Failed to migrate legacy DarkTimer storage:', error);
   }
@@ -218,27 +223,67 @@ export async function saveStoredSettings(settings: UserSettings): Promise<UserSe
   return normalized;
 }
 
-export async function getStoredApiKey(provider: AIProvider): Promise<string> {
+export async function getLegacyStoredApiKey(provider: AIProvider): Promise<string> {
   await initStorage();
   const db = await getDb();
   const record = await db.get('apiKeys', provider);
-  return record?.key ?? '';
+  const legacyKey = record?.key ?? '';
+
+  if (legacyKey) {
+    return legacyKey;
+  }
+
+  if (typeof localStorage === 'undefined') {
+    return '';
+  }
+
+  const storageKey = provider === 'gemini' ? LEGACY_GEMINI_KEY : LEGACY_MISTRAL_KEY;
+  return localStorage.getItem(storageKey) ?? '';
 }
 
-export async function getStoredApiKeys(): Promise<Record<AIProvider, string>> {
+export async function getLegacyStoredApiKeys(): Promise<Record<AIProvider, string>> {
   const [gemini, mistral] = await Promise.all([
-    getStoredApiKey('gemini'),
-    getStoredApiKey('mistral'),
+    getLegacyStoredApiKey('gemini'),
+    getLegacyStoredApiKey('mistral'),
   ]);
 
   return { gemini, mistral };
 }
 
-export async function saveStoredApiKey(provider: AIProvider, key: string): Promise<void> {
+export async function clearLegacyStoredApiKeys(): Promise<void> {
   await initStorage();
   const db = await getDb();
-  await db.put('apiKeys', { provider, key });
-  emit('apiKeys');
+
+  await Promise.all([
+    db.delete('apiKeys', 'gemini'),
+    db.delete('apiKeys', 'mistral'),
+  ]);
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(LEGACY_GEMINI_KEY);
+    localStorage.removeItem(LEGACY_MISTRAL_KEY);
+  }
+}
+
+export async function getStoredEncryptedApiKeyVault(): Promise<EncryptedApiKeyVaultRecord | null> {
+  await initStorage();
+  const db = await getDb();
+  const record = await db.get('secureVault', ENCRYPTED_API_VAULT_KEY);
+  return record ?? null;
+}
+
+export async function saveStoredEncryptedApiKeyVault(
+  record: EncryptedApiKeyVaultRecord,
+): Promise<void> {
+  await initStorage();
+  const db = await getDb();
+  await db.put('secureVault', record, ENCRYPTED_API_VAULT_KEY);
+}
+
+export async function clearStoredEncryptedApiKeyVault(): Promise<void> {
+  await initStorage();
+  const db = await getDb();
+  await db.delete('secureVault', ENCRYPTED_API_VAULT_KEY);
 }
 
 export async function getStoredPresets(): Promise<Preset[]> {
