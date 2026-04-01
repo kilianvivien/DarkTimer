@@ -30,7 +30,14 @@ describe('SessionView', () => {
     const user = userEvent.setup();
     const onExit = vi.fn();
 
-    render(<SessionView recipe={recipe} onExit={onExit} settings={DEFAULT_SETTINGS} />);
+    render(
+      <SessionView
+        recipe={recipe}
+        onExit={onExit}
+        onSaveSession={vi.fn().mockResolvedValue(undefined)}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
 
     expect(screen.getByText('HP5 Plus')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /exit session/i }));
@@ -40,12 +47,37 @@ describe('SessionView', () => {
   it('shows the completion state and allows rerunning the timer', async () => {
     const user = userEvent.setup();
 
-    render(<SessionView recipe={recipe} onExit={vi.fn()} settings={DEFAULT_SETTINGS} />);
+    render(
+      <SessionView
+        recipe={recipe}
+        onExit={vi.fn()}
+        onSaveSession={vi.fn().mockResolvedValue(undefined)}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Complete Timer' }));
     expect(screen.getByText(/session complete/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /run again/i }));
     expect(screen.getByRole('button', { name: 'Complete Timer' })).toBeInTheDocument();
+  });
+
+  it('does not save history when leaving before the timer starts', async () => {
+    const user = userEvent.setup();
+    const onSaveSession = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SessionView
+        recipe={recipe}
+        onExit={vi.fn()}
+        onSaveSession={onSaveSession}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /exit session/i }));
+
+    expect(onSaveSession).not.toHaveBeenCalled();
   });
 });

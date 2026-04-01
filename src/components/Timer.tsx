@@ -2,18 +2,37 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
-import { DevPhase, getAgitationDescription, getAgitationInterval } from '../services/recipe';
+import {
+  DevPhase,
+  getAgitationDescription,
+  getAgitationInterval,
+  type SessionStatus,
+} from '../services/recipe';
 import { showNotification } from '../services/notifications';
 import type { UserSettings } from '../services/userSettings';
+
+export interface TimerSessionResult {
+  startTime: number;
+  endTime: number;
+  status: SessionStatus;
+  phasesCompleted: number;
+}
 
 interface TimerProps {
   phases: DevPhase[];
   onComplete: () => void;
   onExitSession: () => void;
+  onSessionEnd: (result: TimerSessionResult) => Promise<void> | void;
   settings: UserSettings;
 }
 
-export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession, settings }) => {
+export const Timer: React.FC<TimerProps> = ({
+  phases,
+  onComplete,
+  onExitSession,
+  onSessionEnd,
+  settings,
+}) => {
   const notificationsEnabled = settings.notificationsEnabled;
   const countdownFrom = settings.phaseCountdown;
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -32,6 +51,10 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastAgitationCueRef = useRef<string | null>(null);
+  const sessionStartTimeRef = useRef<number | null>(null);
+  const hasProgressRef = useRef(false);
+  const phasesCompletedRef = useRef(0);
+  const sessionReportedRef = useRef(false);
 
   const AGITATION_ALERT_SECONDS = 5;
   const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
@@ -136,6 +159,31 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     navigator.vibrate(pattern);
   };
 
+  const startSession = () => {
+    if (sessionStartTimeRef.current !== null) {
+      return;
+    }
+
+    sessionStartTimeRef.current = Date.now();
+    hasProgressRef.current = false;
+    phasesCompletedRef.current = 0;
+    sessionReportedRef.current = false;
+  };
+
+  const reportSessionEnd = async (status: SessionStatus, phasesCompleted = phasesCompletedRef.current) => {
+    if (sessionReportedRef.current || sessionStartTimeRef.current === null) {
+      return;
+    }
+
+    sessionReportedRef.current = true;
+    await onSessionEnd({
+      startTime: sessionStartTimeRef.current,
+      endTime: Date.now(),
+      status,
+      phasesCompleted,
+    });
+  };
+
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
@@ -148,6 +196,10 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     setIsAgitating(false);
     setFlashVisible(false);
     lastAgitationCueRef.current = null;
+    sessionStartTimeRef.current = null;
+    hasProgressRef.current = false;
+    phasesCompletedRef.current = 0;
+    sessionReportedRef.current = false;
   }, [phases]);
 
   useEffect(() => {
@@ -183,12 +235,20 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
 
     if (isActive && timeLeft > 0) {
       interval = window.setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
+        setTimeLeft((prev) => {
+          const next = prev - 1;
+          if (next < phases[currentPhaseIndex].duration) {
+            hasProgressRef.current = true;
+          }
+
+          return next;
+        });
       }, 1000);
     } else if (timeLeft === 0 && isActive) {
       playBeep(880, 0.5); // End of phase beep
       if (currentPhaseIndex < phases.length - 1) {
         const nextPhase = phases[currentPhaseIndex + 1];
+        phasesCompletedRef.current = currentPhaseIndex + 1;
         if (notificationsEnabled) {
           showNotification(`${phases[currentPhaseIndex].name} complete`, `Next: ${nextPhase.name}`);
         }
@@ -196,18 +256,22 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
         setCurrentPhaseIndex((prev) => prev + 1);
         setIsActive(false);
       } else {
+        phasesCompletedRef.current = phases.length;
         if (notificationsEnabled) {
           showNotification('Development complete', 'All phases finished.');
         }
         triggerVibration([160, 120, 220]);
         setIsActive(false);
-        void exitFullscreen();
-        onComplete();
+        void (async () => {
+          await exitFullscreen();
+          await reportSessionEnd('completed', phases.length);
+          onComplete();
+        })();
       }
     }
 
     return () => clearInterval(interval);
-  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, phases, timeLeft]);
+  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, onSessionEnd, phases, timeLeft]);
 
   // Agitation Logic
   useEffect(() => {
@@ -272,6 +336,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     if (countdown === 0) {
       playTick(880, 0.5);
       setCountdown(null);
+      startSession();
       setIsActive(true);
       return;
     }
@@ -290,6 +355,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
       if (countdownFrom > 0) {
         setCountdown(countdownFrom);
       } else {
+        startSession();
         setIsActive(true);
       }
     } else {
@@ -329,6 +395,9 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     setIsAgitating(false);
     setFlashVisible(false);
     await exitFullscreen();
+    if (sessionStartTimeRef.current !== null) {
+      await reportSessionEnd(hasProgressRef.current ? 'partial' : 'aborted');
+    }
     onExitSession();
   };
 

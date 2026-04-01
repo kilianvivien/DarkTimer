@@ -2,6 +2,7 @@ import type { UserSettings } from './settings';
 
 export type ProcessMode = 'bw' | 'color';
 export type AgitationMode = 'every-60s' | 'every-30s' | 'stand';
+export type SessionStatus = 'completed' | 'partial' | 'aborted';
 
 export interface DevPhase {
   name: string;
@@ -20,6 +21,15 @@ export interface DevRecipe {
   phases: DevPhase[];
   notes: string;
   source?: string;
+}
+
+export interface Session {
+  id: string;
+  recipe: DevRecipe;
+  startTime: number;
+  endTime: number;
+  status: SessionStatus;
+  phasesCompleted: number;
 }
 
 export const DEFAULT_BW_TEMP_C = 20;

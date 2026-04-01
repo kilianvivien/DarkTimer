@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Preset } from '../services/presetTypes';
+import type { Session } from '../services/recipe';
 import {
   initStorage,
   subscribeToStorage,
   getStoredPresets,
+  getStoredSessions,
   getStoredSettings,
   saveStoredSettings,
 } from '../services/storage';
@@ -96,6 +98,14 @@ export function useStoredPresets(): AsyncState<Preset[]> {
   return useStoredResource(
     useCallback(() => getStoredPresets(), []),
     useCallback((listener: () => void) => subscribeToStorage('presets', listener), []),
+    [],
+  );
+}
+
+export function useStoredSessions(): AsyncState<Session[]> {
+  return useStoredResource(
+    useCallback(() => getStoredSessions(), []),
+    useCallback((listener: () => void) => subscribeToStorage('sessions', listener), []),
     [],
   );
 }

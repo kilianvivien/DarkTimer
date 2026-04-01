@@ -21,9 +21,12 @@ interface SettingsMenuProps {
   apiKeys: Record<AIProvider, string>;
   hasEncryptedApiKeys: boolean;
   isVaultLocked: boolean;
+  onClearHistory: () => Promise<void>;
   onForgetSavedKeys: (settings: UserSettings) => Promise<void>;
+  onSettingsChange: (settings: UserSettings) => Promise<void>;
   onSave: (request: SettingsSaveRequest) => Promise<void>;
   onUnlockSavedKeys: (passphrase: string) => Promise<void>;
+  sessionCount: number;
   settings: UserSettings;
 }
 
@@ -175,9 +178,12 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   apiKeys,
   hasEncryptedApiKeys,
   isVaultLocked,
+  onClearHistory,
   onForgetSavedKeys,
+  onSettingsChange,
   onSave,
   onUnlockSavedKeys,
+  sessionCount,
   settings: initialSettings,
 }) => {
   const [settings, setSettings] = useState<UserSettings>(initialSettings);
@@ -190,10 +196,15 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   const [unlockPassphrase, setUnlockPassphrase] = useState('');
   const [permissionStatus, setPermissionStatus] = useState(notificationPermission());
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isForgettingKeys, setIsForgettingKeys] = useState(false);
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
+  const [confirmClearHistory, setConfirmClearHistory] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [settingsError, setSettingsError] = useState('');
   const [unlockError, setUnlockError] = useState('');
+  const [historyError, setHistoryError] = useState('');
   const vibrationSupported = typeof navigator !== 'undefined' && 'vibrate' in navigator;
 
   useEffect(() => {
@@ -212,20 +223,41 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     }
   }, [isVaultLocked]);
 
+  useEffect(() => {
+    if (sessionCount === 0) {
+      setConfirmClearHistory(false);
+    }
+  }, [sessionCount]);
+
+  const updateSettings = async (nextSettings: UserSettings) => {
+    const previousSettings = settings;
+    setSettings(nextSettings);
+    setIsSavingSettings(true);
+    setSettingsError('');
+
+    try {
+      await onSettingsChange(nextSettings);
+    } catch (error) {
+      setSettings(previousSettings);
+      setSettingsError(error instanceof Error ? error.message : 'Settings could not be updated.');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
   const handleChange = <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
-    setSettings({ ...settings, [field]: value });
+    void updateSettings({ ...settings, [field]: value });
   };
 
   const handleRequestPermission = async () => {
     const result = await requestNotificationPermission();
     setPermissionStatus(result);
     if (result === 'granted') {
-      setSettings(s => ({ ...s, notificationsEnabled: true }));
+      await updateSettings({ ...settings, notificationsEnabled: true });
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     const normalizedApiKeys = {
       gemini: geminiApiKey.trim(),
       mistral: mistralApiKey.trim(),
@@ -314,8 +346,22 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     }
   };
 
+  const handleClearHistory = async () => {
+    setIsClearingHistory(true);
+    setHistoryError('');
+
+    try {
+      await onClearHistory();
+      setConfirmClearHistory(false);
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : 'Session history could not be cleared.');
+    } finally {
+      setIsClearingHistory(false);
+    }
+  };
+
   return (
-    <form onSubmit={handleSave} className="w-full max-w-xl space-y-8">
+    <div className="w-full max-w-xl space-y-8">
 
       {/* Development settings */}
       <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-2">
@@ -329,7 +375,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         <CollapsibleSection
           title="Black & White"
           hint="Developer · Stop Bath · Fixer · Wash"
-          defaultOpen={true}
+          defaultOpen={false}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <DurationSettingField
@@ -691,6 +737,18 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             Requests still go directly from your browser to Google or Mistral. Session-only keys are not stored. Remembered keys are stored encrypted.
           </p>
         </div>
+
+        <div className="border-t border-dark-border pt-6 space-y-3">
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={isSaving || isSavingSettings}
+            className="w-full utilitarian-button bg-white text-black font-bold py-4 hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2 disabled:opacity-60"
+          >
+            <Save size={18} />
+            <span>{isSaving ? 'Saving API Keys…' : isSavingSettings ? 'Saving Settings…' : 'Save API Keys'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Notifications */}
@@ -776,16 +834,72 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         )}
       </div>
 
+      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-5">
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold uppercase tracking-tight">History & Data</h2>
+          <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
+            Manage the local timer sessions saved on this device
+          </p>
+        </div>
+
+        <div className="border border-dark-border p-4 space-y-4">
+          <div className="space-y-1">
+            <p className="mono-label text-white">Saved sessions</p>
+            <p className="text-xs text-ui-gray leading-relaxed">
+              {sessionCount === 0
+                ? 'No session history is saved right now.'
+                : `${sessionCount} session${sessionCount === 1 ? '' : 's'} saved locally in DarkTimer history.`}
+            </p>
+          </div>
+
+          {confirmClearHistory ? (
+            <div className="space-y-3 border border-accent-red/30 bg-accent-red/5 p-4">
+              <p className="text-xs font-mono uppercase tracking-[0.18em] text-accent-red">
+                Clear all saved session history?
+              </p>
+              <p className="text-xs leading-relaxed text-ui-gray">
+                This only removes the history log. Your presets, settings, and API key storage stay untouched.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => void handleClearHistory()}
+                  disabled={isClearingHistory}
+                  className="utilitarian-button border-accent-red bg-accent-red px-4 py-3 text-xs font-mono uppercase tracking-widest text-white disabled:opacity-60"
+                >
+                  {isClearingHistory ? 'Clearing History…' : 'Yes, Clear History'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearHistory(false)}
+                  disabled={isClearingHistory}
+                  className="utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setHistoryError('');
+                setConfirmClearHistory(true);
+              }}
+              disabled={sessionCount === 0}
+              className="utilitarian-button w-full sm:w-auto px-4 py-3 text-xs font-mono uppercase tracking-widest disabled:opacity-40"
+            >
+              Clear History
+            </button>
+          )}
+
+          {historyError ? <p className="text-xs font-mono text-accent-red">{historyError}</p> : null}
+        </div>
+      </div>
+
+      {settingsError ? <p className="text-xs font-mono text-accent-red">{settingsError}</p> : null}
       {saveError ? <p className="text-xs font-mono text-accent-red">{saveError}</p> : null}
 
-      <button
-        type="submit"
-        disabled={isSaving}
-        className="w-full utilitarian-button bg-white text-black font-bold py-4 hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2 disabled:opacity-60"
-      >
-        <Save size={18} />
-        <span>{isSaving ? 'Saving Settings…' : 'Save Settings'}</span>
-      </button>
-    </form>
+    </div>
   );
 };

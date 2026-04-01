@@ -1,13 +1,14 @@
 import React, { Suspense, lazy, startTransition, useCallback, useEffect, useState } from 'react';
 import { ManualTimerForm } from './components/ManualTimerForm';
-import { DevRecipe } from './services/recipe';
-import { deletePreset, savePreset, type Preset } from './services/presets';
-import { Camera, Sparkles, Info, Library, Settings, Sliders, Github } from 'lucide-react';
+import { DevRecipe, type Session } from './services/recipe';
+import { deletePreset, savePreset } from './services/presets';
+import { Camera, Sparkles, Info, Library, Settings, Sliders, Github, History as HistoryIcon } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
 import { DEFAULT_SETTINGS, saveAiProvider, saveSettings } from './services/settings';
-import { useStorageReady, useStoredPresets, useStoredSettings } from './hooks/useStoredData';
+import { useStorageReady, useStoredPresets, useStoredSessions, useStoredSettings } from './hooks/useStoredData';
 import { useApiKeySession } from './hooks/useApiKeySession';
+import { clearStoredSessions, saveStoredSession } from './services/storage';
 import type { AIProvider, UserSettings } from './services/userSettings';
 import {
   clearEncryptedApiKeys,
@@ -18,7 +19,7 @@ import {
 } from './services/secretStorage';
 import type { SettingsSaveRequest } from './components/SettingsMenu';
 
-type View = 'manual' | 'ai' | 'library' | 'settings' | 'timer';
+type View = 'manual' | 'ai' | 'library' | 'history' | 'settings' | 'timer';
 type ToastTone = 'success' | 'error';
 
 interface ToastState {
@@ -36,6 +37,9 @@ const PresetLibrary = lazy(() =>
 const SettingsMenu = lazy(() =>
   import('./components/SettingsMenu').then((module) => ({ default: module.SettingsMenu })),
 );
+const HistoryView = lazy(() =>
+  import('./components/HistoryView').then((module) => ({ default: module.HistoryView })),
+);
 const SessionView = lazy(() =>
   import('./components/SessionView').then((module) => ({ default: module.SessionView })),
 );
@@ -44,9 +48,10 @@ const NAV_ITEMS: { view: View; label: string; Icon: React.FC<{ size?: number; cl
   { view: 'manual',   label: 'Manual',   Icon: Sliders },
   { view: 'ai',       label: 'AI',       Icon: Sparkles },
   { view: 'library',  label: 'Library',  Icon: Library },
+  { view: 'history',  label: 'History',  Icon: HistoryIcon },
   { view: 'settings', label: 'Settings', Icon: Settings },
 ];
-const SWIPEABLE_VIEWS: View[] = ['manual', 'ai', 'library', 'settings'];
+const SWIPEABLE_VIEWS: View[] = ['manual', 'ai', 'library', 'history', 'settings'];
 
 function getViewIndex(view: View): number {
   return SWIPEABLE_VIEWS.indexOf(view);
@@ -70,6 +75,7 @@ export default function App() {
   const storageReady = useStorageReady();
   const { data: settings, isLoading: settingsLoading } = useStoredSettings(DEFAULT_SETTINGS);
   const { data: presets, isLoading: presetsLoading } = useStoredPresets();
+  const { data: sessions, isLoading: sessionsLoading } = useStoredSessions();
   const {
     apiKeys,
     hasEncryptedApiKeys,
@@ -77,7 +83,7 @@ export default function App() {
     isReady: apiKeysReady,
     migrationNotice,
   } = useApiKeySession();
-  const appReady = storageReady && !settingsLoading && !presetsLoading && apiKeysReady;
+  const appReady = storageReady && !settingsLoading && !presetsLoading && !sessionsLoading && apiKeysReady;
 
   const notify = useCallback((message: string, tone: ToastTone = 'success') => {
     setToast({
@@ -188,8 +194,11 @@ export default function App() {
       await saveEncryptedApiKeys(passphrase, normalizedApiKeys);
     }
 
-    notify('Settings saved.');
-    changeView('manual');
+    notify('API key settings saved.');
+  };
+
+  const handleUpdateSettings = async (nextSettings: UserSettings) => {
+    await saveSettings(nextSettings);
   };
 
   const handleUnlockSavedKeys = async (passphrase: string) => {
@@ -207,6 +216,25 @@ export default function App() {
 
   const handleProviderChange = async (provider: AIProvider) => {
     await saveAiProvider(provider);
+  };
+
+  const handleSaveSession = async (session: Session) => {
+    try {
+      await saveStoredSession(session);
+    } catch (error) {
+      console.error('Failed to save session history entry:', error);
+      notify('Session history could not be saved.', 'error');
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await clearStoredSessions();
+      notify('Session history cleared.');
+    } catch (error) {
+      console.error('Failed to clear session history:', error);
+      throw error;
+    }
   };
 
   const activeView = view === 'timer' ? 'manual' : view;
@@ -369,11 +397,30 @@ export default function App() {
                   apiKeys={apiKeys}
                   hasEncryptedApiKeys={hasEncryptedApiKeys}
                   isVaultLocked={isApiKeyVaultLocked}
+                  onClearHistory={handleClearHistory}
                   onForgetSavedKeys={handleForgetSavedKeys}
+                  onSettingsChange={handleUpdateSettings}
                   onSave={handleSaveSettings}
                   onUnlockSavedKeys={handleUnlockSavedKeys}
+                  sessionCount={sessions.length}
                   settings={settings}
                 />
+              </motion.div>
+            </Suspense>
+          )}
+
+          {view === 'history' && (
+            <Suspense fallback={<ViewLoader label="Loading history" />}>
+              <motion.div
+                key="history"
+                {...viewMotion}
+                className="w-full flex flex-col items-center space-y-6 md:space-y-8"
+              >
+                <div className="text-center space-y-2">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">History</h1>
+                  <p className="mono-label">Your recent development sessions</p>
+                </div>
+                <HistoryView sessions={sessions} />
               </motion.div>
             </Suspense>
           )}
@@ -387,7 +434,12 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="w-full"
               >
-                <SessionView recipe={recipe} onExit={reset} settings={settings} />
+                <SessionView
+                  recipe={recipe}
+                  onExit={reset}
+                  onSaveSession={handleSaveSession}
+                  settings={settings}
+                />
               </motion.div>
             </Suspense>
           )}
@@ -478,8 +530,12 @@ export default function App() {
                   <p>Save recipes from Manual or AI mode to keep them here. Tap any preset to jump straight into a timer session.</p>
                 </div>
                 <div className="space-y-1">
+                  <p className="text-white uppercase tracking-widest text-xs">History</p>
+                  <p>DarkTimer saves completed and interrupted timer runs locally so you can review recent development sessions on-device.</p>
+                </div>
+                <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Settings</p>
-                  <p>Set your development defaults, choose your AI provider, add your API keys, and manage notifications.</p>
+                  <p>Set your development defaults, choose your AI provider, add your API keys, manage notifications, and clear session history.</p>
                 </div>
               </div>
             </motion.div>
