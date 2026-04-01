@@ -111,4 +111,27 @@ describe('SettingsMenu', () => {
       expect.objectContaining({ apiKeyPersistenceMode: 'session' }),
     );
   });
+
+  it('renders settings inputs with mobile-safe sizing classes', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SettingsMenu
+        apiKeys={{ gemini: '', mistral: '' }}
+        hasEncryptedApiKeys={false}
+        isVaultLocked={false}
+        onForgetSavedKeys={vi.fn().mockResolvedValue(undefined)}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        onUnlockSavedKeys={vi.fn().mockResolvedValue(undefined)}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /secure remember/i }));
+
+    expect(screen.getByPlaceholderText('Create a passphrase')).toHaveClass('mobile-form-control-inline');
+    expect(screen.getByDisplayValue(String(DEFAULT_SETTINGS.defaultBwTempC))).toHaveClass(
+      'mobile-form-control-inline',
+    );
+  });
 });

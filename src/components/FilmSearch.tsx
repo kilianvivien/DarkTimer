@@ -198,7 +198,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
             <select
               value={iso}
               onChange={(e) => setIso(parseInt(e.target.value))}
-              className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
+              className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
             >
               {ISO_OPTIONS.map((v) => (
                 <option key={v} value={v}>{v}</option>

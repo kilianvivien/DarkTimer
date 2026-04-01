@@ -78,6 +78,26 @@ describe('FilmSearch', () => {
     expect(screen.getByRole('button', { name: /ask ai/i })).toBeDisabled();
   });
 
+  it('renders representative controls with mobile-safe sizing classes', () => {
+    render(
+      <FilmSearch
+        apiKeys={{ gemini: 'test-key', mistral: '' }}
+        hasEncryptedApiKeys={false}
+        isVaultLocked={false}
+        onOpenSettings={vi.fn()}
+        onProviderChange={vi.fn().mockResolvedValue(undefined)}
+        onRecipeFound={vi.fn()}
+        onSavePreset={vi.fn().mockResolvedValue(undefined)}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
+
+    expect(screen.getByDisplayValue(String(DEFAULT_SETTINGS.defaultBwTempC))).toHaveClass(
+      'mobile-form-control-inline',
+    );
+    expect(screen.getByRole('combobox')).toHaveClass('mobile-form-control-compact');
+  });
+
   it('renders successful AI results and supports select/save actions', async () => {
     const user = userEvent.setup();
     const onRecipeFound = vi.fn();

@@ -172,16 +172,16 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
             className="utilitarian-input w-full"
           />
         </div>
-        <div className="space-y-1">
-          <label className="mono-label">ISO</label>
-          <select
-            value={iso}
-            onChange={(e) => setIso(parseInt(e.target.value))}
-            className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
-          >
-            {ISO_OPTIONS.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+          <div className="space-y-1">
+            <label className="mono-label">ISO</label>
+            <select
+              value={iso}
+              onChange={(e) => setIso(parseInt(e.target.value))}
+              className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
+            >
+              {ISO_OPTIONS.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
           </select>
         </div>
       </div>
@@ -213,7 +213,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                       type="text"
                       value={phase.name}
                       onChange={(e) => updatePhase(i, 'name', e.target.value)}
-                      className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full font-mono text-sm"
+                      className="mobile-form-control-inline bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full font-mono"
                     />
                   </div>
                   <button
@@ -233,7 +233,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                         type="number"
                         value={mins}
                         onChange={(e) => updatePhaseTime(i, 'min', parseInt(e.target.value) || 0)}
-                        className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono text-sm"
+                        className="mobile-form-control-inline bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono"
                         min="0"
                       />
                       <span className="text-[10px] font-mono text-ui-gray uppercase">m</span>
@@ -243,7 +243,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                         type="number"
                         value={secs}
                         onChange={(e) => updatePhaseTime(i, 'sec', parseInt(e.target.value) || 0)}
-                        className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono text-sm"
+                        className="mobile-form-control-inline bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono"
                         min="0"
                         max="59"
                       />
@@ -255,7 +255,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                     <select
                       value={phase.agitationMode ?? 'stand'}
                       onChange={(e) => updatePhase(i, 'agitationMode', e.target.value as AgitationMode)}
-                      className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
+                      className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
                     >
                       {AGITATION_OPTIONS.map((option) => (
                         <option key={option} value={option}>

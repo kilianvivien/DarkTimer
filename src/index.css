@@ -14,6 +14,7 @@
 @layer base {
   :root {
     color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -41,6 +42,14 @@
     outline: 2px solid var(--color-accent-red);
     outline-offset: 2px;
   }
+
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
 }
 
 .mono-label {
@@ -56,7 +65,27 @@
 }
 
 .utilitarian-input {
-  @apply bg-transparent border border-dark-border px-4 py-2 focus:outline-none focus:border-accent-red transition-all font-mono text-sm;
+  @apply bg-transparent border border-dark-border px-4 py-2 focus:outline-none focus:border-accent-red transition-all font-mono;
+  font-size: 1rem;
+}
+
+.mobile-form-control-inline {
+  font-size: 1rem;
+}
+
+.mobile-form-control-compact {
+  font-size: 1rem;
+}
+
+@media (min-width: 768px) {
+  .utilitarian-input,
+  .mobile-form-control-inline {
+    font-size: 0.875rem;
+  }
+
+  .mobile-form-control-compact {
+    font-size: 0.75rem;
+  }
 }
 
 .red-glow {

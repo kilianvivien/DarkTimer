@@ -52,7 +52,7 @@ const DurationSettingField: React.FC<DurationSettingFieldProps> = ({ label, valu
             type="number"
             value={mins}
             onChange={(e) => updatePart('min', parseInt(e.target.value) || 0)}
-            className="utilitarian-input flex-1 min-w-0 text-center"
+            className="utilitarian-input mobile-form-control-inline flex-1 min-w-0 text-center"
             min="0"
           />
           <span className="text-[10px] font-mono text-ui-gray uppercase shrink-0">m</span>
@@ -62,7 +62,7 @@ const DurationSettingField: React.FC<DurationSettingFieldProps> = ({ label, valu
             type="number"
             value={secs}
             onChange={(e) => updatePart('sec', parseInt(e.target.value) || 0)}
-            className="utilitarian-input flex-1 min-w-0 text-center"
+            className="utilitarian-input mobile-form-control-inline flex-1 min-w-0 text-center"
             min="0"
             max="59"
           />
@@ -351,7 +351,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
               type="number"
               value={settings.defaultBwTempC}
               onChange={(e) => handleChange('defaultBwTempC', parseFloat(e.target.value) || 0)}
-              className="utilitarian-input w-full md:w-40"
+              className="utilitarian-input mobile-form-control-inline w-full md:w-40"
               step="0.5"
             />
           </div>
@@ -385,7 +385,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
               type="number"
               value={settings.defaultColorTempC}
               onChange={(e) => handleChange('defaultColorTempC', parseFloat(e.target.value) || 0)}
-              className="utilitarian-input w-full md:w-40"
+              className="utilitarian-input mobile-form-control-inline w-full md:w-40"
               step="0.5"
             />
           </div>
@@ -510,7 +510,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       type="password"
                       value={unlockPassphrase}
                       onChange={(event) => setUnlockPassphrase(event.target.value)}
-                      className="utilitarian-input w-full font-mono"
+                      className="utilitarian-input mobile-form-control-inline w-full font-mono"
                       placeholder="Enter passphrase"
                       autoComplete="off"
                       spellCheck={false}
@@ -535,7 +535,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     type="password"
                     value={securePassphrase}
                     onChange={(event) => setSecurePassphrase(event.target.value)}
-                    className="utilitarian-input w-full font-mono"
+                    className="utilitarian-input mobile-form-control-inline w-full font-mono"
                     placeholder={hasEncryptedApiKeys ? 'Only needed to update saved keys' : 'Create a passphrase'}
                     autoComplete="new-password"
                     spellCheck={false}
@@ -547,7 +547,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     type="password"
                     value={securePassphraseConfirm}
                     onChange={(event) => setSecurePassphraseConfirm(event.target.value)}
-                    className="utilitarian-input w-full font-mono"
+                    className="utilitarian-input mobile-form-control-inline w-full font-mono"
                     placeholder="Confirm passphrase"
                     autoComplete="new-password"
                     spellCheck={false}
@@ -592,7 +592,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 type={showGeminiKey ? 'text' : 'password'}
                 value={geminiApiKey}
                 onChange={(e) => setGeminiApiKey(e.target.value)}
-                className="utilitarian-input w-full font-mono"
+                className="utilitarian-input mobile-form-control-inline w-full font-mono"
                 placeholder={
                   settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked
                     ? 'Unlock saved keys to view or edit'
@@ -643,7 +643,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 type={showMistralKey ? 'text' : 'password'}
                 value={mistralApiKey}
                 onChange={(e) => setMistralApiKey(e.target.value)}
-                className="utilitarian-input w-full font-mono"
+                className="utilitarian-input mobile-form-control-inline w-full font-mono"
                 placeholder={
                   settings.apiKeyPersistenceMode === 'encrypted' && hasEncryptedApiKeys && isVaultLocked
                     ? 'Unlock saved keys to view or edit'

@@ -24,7 +24,7 @@ export const TemperatureInput: React.FC<TemperatureInputProps> = ({ value, onCha
         type="number"
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="bg-transparent px-3 py-2 focus:outline-none font-mono text-sm text-center flex-1 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        className="mobile-form-control-inline bg-transparent px-3 py-2 focus:outline-none font-mono text-center flex-1 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         step={step}
       />
       <button

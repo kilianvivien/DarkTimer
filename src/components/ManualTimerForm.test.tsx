@@ -76,4 +76,25 @@ describe('ManualTimerForm', () => {
       agitation: 'Agitate every 1 minute.',
     });
   });
+
+  it('renders inline phase controls with mobile-safe sizing classes', () => {
+    render(
+      <ManualTimerForm
+        onStart={vi.fn()}
+        onSavePreset={vi.fn().mockResolvedValue(undefined)}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
+
+    const developerRow = screen.getByDisplayValue('Developer').closest('.utilitarian-border');
+    expect(developerRow).not.toBeNull();
+
+    const phaseNameInput = screen.getByDisplayValue('Developer');
+    const [minutesInput] = within(developerRow as HTMLElement).getAllByRole('spinbutton');
+    const phaseAgitationSelect = within(developerRow as HTMLElement).getByRole('combobox');
+
+    expect(phaseNameInput).toHaveClass('mobile-form-control-inline');
+    expect(minutesInput).toHaveClass('mobile-form-control-inline');
+    expect(phaseAgitationSelect).toHaveClass('mobile-form-control-compact');
+  });
 });
