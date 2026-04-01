@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { buildRecipeLookupPrompt, normalizeDevResponse, parseJsonResponse } from './aiShared';
+import {
+  buildRecipeLookupPrompt,
+  buildRecipeLookupSystemPrompt,
+  buildRecipeLookupUserPrompt,
+  normalizeDevResponse,
+  parseJsonResponse,
+} from './aiShared';
 
 describe('aiShared helpers', () => {
-  it('builds a lookup prompt with the selected process details', () => {
-    const prompt = buildRecipeLookupPrompt({
+  it('builds separated lookup prompts with the selected process details', () => {
+    const systemPrompt = buildRecipeLookupSystemPrompt();
+    const userPrompt = buildRecipeLookupUserPrompt({
+      film: 'Tri-X',
+      developer: 'Rodinal',
+      iso: '400',
+      tempC: 20,
+      dilution: '1+25',
+      processMode: 'bw',
+    });
+    const combinedPrompt = buildRecipeLookupPrompt({
       film: 'Tri-X',
       developer: 'Rodinal',
       iso: '400',
@@ -12,11 +27,15 @@ describe('aiShared helpers', () => {
       processMode: 'bw',
     });
 
-    expect(prompt).toContain('Tri-X');
-    expect(prompt).toContain('Rodinal');
-    expect(prompt).toContain('ISO 400');
-    expect(prompt).toContain('1+25');
-    expect(prompt).toContain('Black & White');
+    expect(systemPrompt).toContain('darkroom recipe assistant');
+    expect(systemPrompt).toContain('"options"');
+    expect(userPrompt).toContain('Tri-X');
+    expect(userPrompt).toContain('Rodinal');
+    expect(userPrompt).toContain('ISO 400');
+    expect(userPrompt).toContain('1+25');
+    expect(userPrompt).toContain('Black & White');
+    expect(combinedPrompt).toContain(systemPrompt);
+    expect(combinedPrompt).toContain(userPrompt);
   });
 
   it('normalizes parsed recipe options against fallback values', () => {
@@ -58,7 +77,7 @@ describe('aiShared helpers', () => {
               iso: 400,
               tempC: 20,
               processMode: 'bw',
-              phases: [],
+              phases: [{ name: 'Developer', duration: 420 }],
             },
           ],
         }),
@@ -69,5 +88,13 @@ describe('aiShared helpers', () => {
     });
 
     expect(parseJsonResponse('not-json', { processMode: 'bw', tempC: 20 })).toBeNull();
+    expect(
+      parseJsonResponse(
+        JSON.stringify({
+          options: [{ film: 'HP5', developer: 'DD-X', phases: [] }],
+        }),
+        { processMode: 'bw', tempC: 20 },
+      ),
+    ).toBeNull();
   });
 });

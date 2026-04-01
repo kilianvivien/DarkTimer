@@ -1,34 +1,43 @@
-import { ProcessMode } from './recipe';
-import { DevResponse, buildRecipeLookupPrompt, parseJsonResponse } from './aiShared';
+import { AIRecipeError, mapResponseStatusToAIError, toAIRecipeError } from './aiErrors';
+import type { ProcessMode } from './recipe';
+import {
+  type DevResponse,
+  buildRecipeLookupSystemPrompt,
+  buildRecipeLookupUserPrompt,
+  parseJsonResponse,
+} from './aiShared';
 
-interface MistralMessageChunk {
+interface MistralContentChunk {
   type?: string;
   text?: string;
 }
 
-interface MistralMessageOutput {
-  type?: string;
-  content?: string | MistralMessageChunk[];
+interface MistralChatMessage {
+  content?: string | MistralContentChunk[];
 }
 
-interface MistralConversationResponse {
-  outputs?: MistralMessageOutput[];
+interface MistralChoice {
+  message?: MistralChatMessage;
 }
 
-function extractMessageText(output: MistralMessageOutput | undefined): string | null {
-  if (!output) {
+interface MistralChatCompletionsResponse {
+  choices?: MistralChoice[];
+}
+
+function extractMessageText(message: MistralChatMessage | undefined): string | null {
+  if (!message) {
     return null;
   }
 
-  if (typeof output.content === 'string') {
-    return output.content;
+  if (typeof message.content === 'string') {
+    return message.content;
   }
 
-  if (!Array.isArray(output.content)) {
+  if (!Array.isArray(message.content)) {
     return null;
   }
 
-  return output.content
+  return message.content
     .map((chunk) => (chunk.type === 'text' && typeof chunk.text === 'string' ? chunk.text : ''))
     .join('');
 }
@@ -41,9 +50,9 @@ export async function getMistralDevTimes(
   tempC: number,
   dilution: string,
   processMode: ProcessMode,
-): Promise<DevResponse | null> {
+): Promise<DevResponse> {
   try {
-    const response = await fetch('https://api.mistral.ai/v1/conversations', {
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,38 +61,48 @@ export async function getMistralDevTimes(
       },
       body: JSON.stringify({
         model: 'mistral-small-latest',
-        store: false,
-        tools: [{ type: 'web_search' }],
-        instructions:
-          'You are a darkroom recipe assistant. Search the web when needed and answer with valid JSON only.',
-        completion_args: {
-          temperature: 0.2,
-          response_format: { type: 'json_object' },
-        },
-        inputs: buildRecipeLookupPrompt({
-          film,
-          developer,
-          iso,
-          tempC,
-          dilution,
-          processMode,
-        }),
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: buildRecipeLookupSystemPrompt(),
+          },
+          {
+            role: 'user',
+            content: buildRecipeLookupUserPrompt({
+              film,
+              developer,
+              iso,
+              tempC,
+              dilution,
+              processMode,
+            }),
+          },
+        ],
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Mistral API request failed with status ${response.status}`);
+      const errorText = await response.text();
+      throw mapResponseStatusToAIError(response.status, 'mistral', errorText);
     }
 
-    const payload = (await response.json()) as MistralConversationResponse;
-    const message = payload.outputs?.find((entry) => entry.type === 'message.output');
+    const payload = (await response.json()) as MistralChatCompletionsResponse;
+    const message = payload.choices?.[0]?.message;
 
-    return parseJsonResponse(extractMessageText(message), {
+    const parsed = parseJsonResponse(extractMessageText(message), {
       processMode,
       tempC,
     });
+
+    if (!parsed) {
+      throw new AIRecipeError('invalid_response', 'mistral');
+    }
+
+    return parsed;
   } catch (error) {
     console.error('Error fetching Mistral dev times:', error);
-    return null;
+    throw toAIRecipeError(error, 'mistral', 'invalid_response');
   }
 }

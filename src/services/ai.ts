@@ -1,10 +1,12 @@
 import { getGeminiDevTimes } from './gemini';
 import { getMistralDevTimes } from './mistral';
-import { ProcessMode } from './recipe';
-import { AIProvider } from './settings';
-import { DevResponse } from './aiShared';
+import { AIRecipeError } from './aiErrors';
+import type { ProcessMode } from './recipe';
+import type { AIProvider } from './settings';
+import type { DevResponse } from './aiShared';
 
 export type { DevResponse } from './aiShared';
+export { AIRecipeError } from './aiErrors';
 
 export async function getDevTimes(
   provider: AIProvider,
@@ -15,10 +17,15 @@ export async function getDevTimes(
   tempC: number,
   dilution: string,
   processMode: ProcessMode,
-): Promise<DevResponse | null> {
-  if (provider === 'mistral') {
-    return getMistralDevTimes(apiKey, film, developer, iso, tempC, dilution, processMode);
+): Promise<DevResponse> {
+  const response =
+    provider === 'mistral'
+      ? await getMistralDevTimes(apiKey, film, developer, iso, tempC, dilution, processMode)
+      : await getGeminiDevTimes(apiKey, film, developer, iso, tempC, dilution, processMode);
+
+  if (response.options.length === 0) {
+    throw new AIRecipeError('no_results', provider);
   }
 
-  return getGeminiDevTimes(apiKey, film, developer, iso, tempC, dilution, processMode);
+  return response;
 }

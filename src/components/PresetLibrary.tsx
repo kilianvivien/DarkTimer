@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Play, Clock, Beaker } from 'lucide-react';
+import { Trash2, Play, Clock, Beaker, Pencil, Check, X } from 'lucide-react';
 import type { Preset } from '../services/presets';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatTemperature, getProcessLabel } from '../services/recipe';
@@ -7,16 +7,19 @@ import { EmptyState } from './EmptyState';
 
 interface PresetLibraryProps {
   presets: Preset[];
+  onEdit: (preset: Preset) => void;
   onSelect: (preset: Preset) => void;
   onDelete: (id: string) => Promise<void>;
 }
 
 export const PresetLibrary: React.FC<PresetLibraryProps> = ({
   presets,
+  onEdit,
   onSelect,
   onDelete,
 }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -24,6 +27,7 @@ export const PresetLibrary: React.FC<PresetLibraryProps> = ({
 
     try {
       await onDelete(id);
+      setConfirmDeleteId((current) => (current === id ? null : current));
     } finally {
       setDeletingId((current) => (current === id ? null : current));
     }
@@ -78,20 +82,58 @@ export const PresetLibrary: React.FC<PresetLibraryProps> = ({
                   </div>
                 </button>
 
-                <div className="flex shrink-0 items-center justify-between sm:justify-end space-x-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <div className="flex shrink-0 items-center justify-between sm:justify-end space-x-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <button
                     type="button"
-                    onClick={(e) => void handleDelete(e, preset.id)}
-                    disabled={deletingId === preset.id}
-                    className="press-feedback p-2 text-ui-gray hover:text-accent-red transition-colors"
-                    aria-label={`Delete preset ${preset.film}`}
-                    title="Delete Preset"
+                    onClick={() => onSelect(preset)}
+                    className="press-feedback p-2 text-accent-red hover:text-white transition-colors"
+                    aria-label={`Play preset ${preset.film}`}
+                    title="Start Preset"
                   >
-                    <Trash2 size={16} />
-                  </button>
-                  <div className="p-2 text-accent-red shrink-0" aria-hidden="true">
                     <Play size={20} fill="currentColor" />
-                  </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onEdit(preset)}
+                    className="press-feedback p-2 text-ui-gray hover:text-white transition-colors"
+                    aria-label={`Edit preset ${preset.film}`}
+                    title="Edit Preset"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  {confirmDeleteId === preset.id ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => void handleDelete(e, preset.id)}
+                        disabled={deletingId === preset.id}
+                        className="press-feedback p-2 text-accent-red hover:text-white transition-colors disabled:opacity-60"
+                        aria-label={`Confirm delete preset ${preset.film}`}
+                        title="Confirm Delete"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="press-feedback p-2 text-ui-gray hover:text-white transition-colors"
+                        aria-label={`Cancel delete preset ${preset.film}`}
+                        title="Cancel Delete"
+                      >
+                        <X size={16} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(preset.id)}
+                      className="press-feedback p-2 text-ui-gray hover:text-accent-red transition-colors"
+                      aria-label={`Delete preset ${preset.film}`}
+                      title="Delete Preset"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
               </motion.article>
             ))}

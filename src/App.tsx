@@ -1,7 +1,8 @@
 import React, { Suspense, lazy, startTransition, useCallback, useEffect, useState } from 'react';
 import { ManualTimerForm } from './components/ManualTimerForm';
 import { DevRecipe, type Session } from './services/recipe';
-import { deletePreset, savePreset } from './services/presets';
+import { deletePreset, savePreset, updatePreset } from './services/presets';
+import type { Preset } from './services/presets';
 import { Camera, Sparkles, Info, Library, Settings, Sliders, Github, History as HistoryIcon } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
@@ -67,6 +68,7 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 export default function App() {
   const [recipe, setRecipe] = useState<DevRecipe | null>(null);
+  const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
   const [view, setView] = useState<View>('manual');
   const [showHelp, setShowHelp] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -117,12 +119,14 @@ export default function App() {
   }, [migrationNotice, notify]);
 
   const handleStartTimer = (newRecipe: DevRecipe) => {
+    setEditingPreset(null);
     setRecipe(newRecipe);
     setNavDirection(1);
     startTransition(() => setView('timer'));
   };
 
   const reset = () => {
+    setEditingPreset(null);
     setRecipe(null);
     setNavDirection(-1);
     startTransition(() => setView('manual'));
@@ -162,12 +166,34 @@ export default function App() {
 
   const handleSavePreset = async (nextRecipe: DevRecipe) => {
     await savePreset(nextRecipe);
+    setEditingPreset(null);
     notify('Recipe saved to library.');
+  };
+
+  const handleUpdatePreset = async (id: string, nextRecipe: DevRecipe) => {
+    await updatePreset(id, nextRecipe);
+    setEditingPreset(null);
+    notify('Preset updated.');
+    if (view !== 'manual') {
+      setNavDirection(-1);
+      startTransition(() => setView('manual'));
+    }
   };
 
   const handleDeletePreset = async (id: string) => {
     await deletePreset(id);
+    if (editingPreset?.id === id) {
+      setEditingPreset(null);
+    }
     notify('Preset removed from library.');
+  };
+
+  const handleEditPreset = (preset: Preset) => {
+    setEditingPreset(preset);
+    const currentIndex = getViewIndex(view === 'timer' ? 'library' : view);
+    const nextIndex = getViewIndex('manual');
+    setNavDirection(nextIndex > currentIndex ? 1 : -1);
+    startTransition(() => setView('manual'));
   };
 
   const handleSaveSettings = async ({
@@ -330,8 +356,11 @@ export default function App() {
                 <p className="mono-label">Input your own development parameters</p>
               </div>
               <ManualTimerForm
+                editingPreset={editingPreset}
+                onCancelEdit={() => setEditingPreset(null)}
                 onStart={handleStartTimer}
                 onSavePreset={handleSavePreset}
+                onUpdatePreset={handleUpdatePreset}
                 settings={settings}
               />
             </motion.div>
@@ -377,6 +406,7 @@ export default function App() {
                   presets={presets}
                   onSelect={handleStartTimer}
                   onDelete={handleDeletePreset}
+                  onEdit={handleEditPreset}
                 />
               </motion.div>
             </Suspense>

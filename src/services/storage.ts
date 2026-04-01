@@ -341,6 +341,26 @@ export async function saveStoredPreset(recipe: DevRecipe): Promise<Preset> {
   return preset;
 }
 
+export async function updateStoredPreset(id: string, recipe: DevRecipe): Promise<Preset> {
+  await initStorage();
+  const db = await getDb();
+  const existing = await db.get('presets', id);
+  const normalizedRecipe = normalizeRecipe(recipe);
+  const preset: Preset = {
+    ...normalizedRecipe,
+    id,
+    createdAt:
+      typeof existing?.createdAt === 'number' && Number.isFinite(existing.createdAt)
+        ? existing.createdAt
+        : Date.now(),
+  };
+
+  await db.put('presets', preset);
+  emit('presets');
+
+  return preset;
+}
+
 export async function deleteStoredPreset(id: string): Promise<void> {
   await initStorage();
   const db = await getDb();
