@@ -2,18 +2,37 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
-import { DevPhase, getAgitationDescription, getAgitationInterval } from '../services/recipe';
+import {
+  DevPhase,
+  getAgitationDescription,
+  getAgitationInterval,
+  type SessionStatus,
+} from '../services/recipe';
 import { showNotification } from '../services/notifications';
 import type { UserSettings } from '../services/userSettings';
+
+export interface TimerSessionResult {
+  startTime: number;
+  endTime: number;
+  status: SessionStatus;
+  phasesCompleted: number;
+}
 
 interface TimerProps {
   phases: DevPhase[];
   onComplete: () => void;
   onExitSession: () => void;
+  onSessionEnd: (result: TimerSessionResult) => Promise<void> | void;
   settings: UserSettings;
 }
 
-export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession, settings }) => {
+export const Timer: React.FC<TimerProps> = ({
+  phases,
+  onComplete,
+  onExitSession,
+  onSessionEnd,
+  settings,
+}) => {
   const notificationsEnabled = settings.notificationsEnabled;
   const countdownFrom = settings.phaseCountdown;
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -25,7 +44,6 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
   const [flashVisible, setFlashVisible] = useState(false);
   const [flashKey, setFlashKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isImmersiveFallback, setIsImmersiveFallback] = useState(false);
   const isMutedRef = useRef(isMuted);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ownsFullscreenRef = useRef(false);
@@ -33,23 +51,13 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastAgitationCueRef = useRef<string | null>(null);
+  const sessionStartTimeRef = useRef<number | null>(null);
+  const hasProgressRef = useRef(false);
+  const phasesCompletedRef = useRef(0);
+  const sessionReportedRef = useRef(false);
 
   const AGITATION_ALERT_SECONDS = 5;
   const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
-  const isImmersiveMode = isFullscreen || isImmersiveFallback;
-
-  const canUseImmersiveFallback = () => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
-    const isStandaloneDisplay =
-      window.matchMedia?.('(display-mode: standalone)').matches ||
-      navigatorWithStandalone.standalone === true;
-
-    return window.innerWidth < 768 || isStandaloneDisplay;
-  };
 
   const getAudioContext = () => {
     const AudioCtx =
@@ -89,8 +97,6 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
   };
 
   const exitFullscreen = async () => {
-    setIsImmersiveFallback(false);
-
     if (!ownsFullscreenRef.current || typeof document === 'undefined' || !document.exitFullscreen) {
       ownsFullscreenRef.current = false;
       return;
@@ -108,27 +114,18 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
   };
 
   const requestFullscreen = async () => {
-    if (typeof document === 'undefined' || document.fullscreenElement) {
-      return;
-    }
-
-    if (!containerRef.current?.requestFullscreen) {
-      if (canUseImmersiveFallback()) {
-        setIsImmersiveFallback(true);
-      }
+    if (
+      typeof document === 'undefined' ||
+      document.fullscreenElement ||
+      !containerRef.current?.requestFullscreen
+    ) {
       return;
     }
 
     try {
       await containerRef.current.requestFullscreen();
       ownsFullscreenRef.current = true;
-      setIsImmersiveFallback(false);
     } catch (error) {
-      if (canUseImmersiveFallback()) {
-        setIsImmersiveFallback(true);
-        return;
-      }
-
       console.error('Failed to enter fullscreen:', error);
     }
   };
@@ -162,6 +159,31 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     navigator.vibrate(pattern);
   };
 
+  const startSession = () => {
+    if (sessionStartTimeRef.current !== null) {
+      return;
+    }
+
+    sessionStartTimeRef.current = Date.now();
+    hasProgressRef.current = false;
+    phasesCompletedRef.current = 0;
+    sessionReportedRef.current = false;
+  };
+
+  const reportSessionEnd = async (status: SessionStatus, phasesCompleted = phasesCompletedRef.current) => {
+    if (sessionReportedRef.current || sessionStartTimeRef.current === null) {
+      return;
+    }
+
+    sessionReportedRef.current = true;
+    await onSessionEnd({
+      startTime: sessionStartTimeRef.current,
+      endTime: Date.now(),
+      status,
+      phasesCompleted,
+    });
+  };
+
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
@@ -173,16 +195,16 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     setCountdown(null);
     setIsAgitating(false);
     setFlashVisible(false);
-    setIsImmersiveFallback(false);
     lastAgitationCueRef.current = null;
+    sessionStartTimeRef.current = null;
+    hasProgressRef.current = false;
+    phasesCompletedRef.current = 0;
+    sessionReportedRef.current = false;
   }, [phases]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(document.fullscreenElement === containerRef.current);
-      if (document.fullscreenElement === containerRef.current) {
-        setIsImmersiveFallback(false);
-      }
       if (document.fullscreenElement !== containerRef.current) {
         ownsFullscreenRef.current = false;
       }
@@ -213,12 +235,20 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
 
     if (isActive && timeLeft > 0) {
       interval = window.setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
+        setTimeLeft((prev) => {
+          const next = prev - 1;
+          if (next < phases[currentPhaseIndex].duration) {
+            hasProgressRef.current = true;
+          }
+
+          return next;
+        });
       }, 1000);
     } else if (timeLeft === 0 && isActive) {
       playBeep(880, 0.5); // End of phase beep
       if (currentPhaseIndex < phases.length - 1) {
         const nextPhase = phases[currentPhaseIndex + 1];
+        phasesCompletedRef.current = currentPhaseIndex + 1;
         if (notificationsEnabled) {
           showNotification(`${phases[currentPhaseIndex].name} complete`, `Next: ${nextPhase.name}`);
         }
@@ -226,18 +256,22 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
         setCurrentPhaseIndex((prev) => prev + 1);
         setIsActive(false);
       } else {
+        phasesCompletedRef.current = phases.length;
         if (notificationsEnabled) {
           showNotification('Development complete', 'All phases finished.');
         }
         triggerVibration([160, 120, 220]);
         setIsActive(false);
-        void exitFullscreen();
-        onComplete();
+        void (async () => {
+          await exitFullscreen();
+          await reportSessionEnd('completed', phases.length);
+          onComplete();
+        })();
       }
     }
 
     return () => clearInterval(interval);
-  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, phases, timeLeft]);
+  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, onSessionEnd, phases, timeLeft]);
 
   // Agitation Logic
   useEffect(() => {
@@ -302,6 +336,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     if (countdown === 0) {
       playTick(880, 0.5);
       setCountdown(null);
+      startSession();
       setIsActive(true);
       return;
     }
@@ -320,6 +355,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
       if (countdownFrom > 0) {
         setCountdown(countdownFrom);
       } else {
+        startSession();
         setIsActive(true);
       }
     } else {
@@ -359,6 +395,9 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
     setIsAgitating(false);
     setFlashVisible(false);
     await exitFullscreen();
+    if (sessionStartTimeRef.current !== null) {
+      await reportSessionEnd(hasProgressRef.current ? 'partial' : 'aborted');
+    }
     onExitSession();
   };
 
@@ -387,17 +426,8 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
       }}
       className={cn(
         "relative overflow-hidden flex flex-col landscape:flex-row bg-dark-panel utilitarian-border w-full transition-colors duration-500 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]",
-        isImmersiveMode && "fixed inset-0 z-[70] h-[100dvh] w-screen max-w-none justify-between border-0 bg-dark-bg shadow-none",
         isAgitating ? "border-accent-red" : "border-dark-border"
       )}
-      style={
-        isImmersiveMode
-          ? {
-              paddingTop: 'env(safe-area-inset-top)',
-              paddingBottom: 'env(safe-area-inset-bottom)',
-            }
-          : undefined
-      }
     >
       <AnimatePresence>
         {flashVisible ? (
@@ -414,12 +444,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
       </AnimatePresence>
 
       {/* Left / main: phase header + time + progress */}
-      <div
-        className={cn(
-          "relative flex flex-col items-center landscape:justify-center landscape:flex-1 p-5 sm:p-6 md:p-10 space-y-5 sm:space-y-6 landscape:space-y-4",
-          isImmersiveMode && "flex-1 justify-center"
-        )}
-      >
+      <div className="relative flex flex-col items-center landscape:justify-center landscape:flex-1 p-6 md:p-10 space-y-6 landscape:space-y-4">
         <div className="text-center space-y-1">
           <p className="mono-label">
             {countdown !== null ? 'Starting in' : `Phase ${currentPhaseIndex + 1}/${phases.length}`}
@@ -492,7 +517,7 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
       </div>
 
       {/* Right / sidebar: agitation + controls + upcoming */}
-      <div className="relative flex flex-col landscape:justify-between landscape:w-64 landscape:border-l landscape:border-dark-border p-4 sm:p-6 landscape:p-5 space-y-5 sm:space-y-6 landscape:space-y-4 border-t landscape:border-t-0 border-dark-border">
+      <div className="relative flex flex-col landscape:justify-between landscape:w-64 landscape:border-l landscape:border-dark-border p-6 landscape:p-5 space-y-6 landscape:space-y-4 border-t landscape:border-t-0 border-dark-border">
 
         {agitationDetails && (
           <div className={cn(
@@ -509,29 +534,31 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
           <button
             onClick={toggleTimer}
             className={cn(
-              "w-full py-3 font-bold uppercase tracking-widest text-sm transition-all hidden landscape:block",
+              "press-feedback w-full py-3 font-bold uppercase tracking-widest text-sm transition-all hidden landscape:block",
               isActive ? "bg-dark-border text-white" : "bg-white text-black hover:bg-accent-red hover:text-white"
             )}
           >
             {countdown !== null ? 'Cancel' : isActive ? 'Pause' : 'Start'}
           </button>
-          <div className={cn(portraitControlsClassName, "landscape:flex landscape:items-center landscape:justify-between landscape:space-x-0")}>
+          <div className="flex items-center justify-center landscape:justify-between space-x-3 landscape:space-x-0">
             <button
               onClick={toggleMute}
-              className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+              className="utilitarian-button p-3"
+              aria-label={isMuted ? 'Unmute timer sounds' : 'Mute timer sounds'}
             >
               {isMuted ? <BellOff size={16} /> : <Bell size={16} />}
             </button>
             <button
               onClick={resetTimer}
-              className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+              className="utilitarian-button p-3"
+              aria-label="Reset current phase"
             >
               <RotateCcw size={16} />
             </button>
             <button
               onClick={toggleTimer}
               className={cn(
-                "landscape:hidden min-w-0 px-3 py-3 font-bold uppercase tracking-[0.18em] text-[0.78rem] transition-all",
+                "press-feedback flex-1 landscape:hidden px-6 py-3 font-bold uppercase tracking-widest text-sm transition-all",
                 isActive ? "bg-dark-border text-white" : "bg-white text-black hover:bg-accent-red hover:text-white"
               )}
             >
@@ -539,14 +566,15 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
             </button>
             <button
               onClick={skipPhase}
-              className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+              className="utilitarian-button p-3"
+              aria-label="Skip current phase"
             >
               <SkipForward size={16} />
             </button>
-            {!isImmersiveMode && (
+            {!isFullscreen && (
               <button
                 onClick={() => void requestFullscreen()}
-                className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+                className="utilitarian-button p-3"
                 aria-label="Enter fullscreen"
               >
                 <Maximize size={16} />
@@ -565,32 +593,33 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
           ))}
         </div>
 
-        {isImmersiveMode && (
-          <div className="flex justify-center pt-2 sm:pt-3">
-            <div className="flex items-center gap-0.5 p-1 rounded-[1.5rem] bg-black/60 backdrop-blur-2xl border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_32px_rgba(0,0,0,0.6)]">
-              <button
-                type="button"
-                onClick={() => void handleLeaveFullscreen()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-[1.2rem] font-mono text-[10px] uppercase tracking-widest text-white/45 hover:text-white/75 transition-colors"
-                aria-label="Leave fullscreen"
-              >
-                <Minimize size={12} />
-                <span>Windowed</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleExitSession()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-[1.2rem] font-mono text-[10px] uppercase tracking-widest text-white/45 hover:text-white/75 transition-colors"
-                aria-label="Exit session"
-              >
-                <X size={12} />
-                <span>Exit</span>
-              </button>
-            </div>
-          </div>
-        )}
-
       </div>
+
+      {/* Fullscreen floating glass controls — anchored at bottom like the nav bar */}
+      {isFullscreen && (
+        <div className="fixed bottom-0 inset-x-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+          <div className="flex items-center gap-0.5 p-1 rounded-[1.5rem] bg-black/60 backdrop-blur-2xl border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_32px_rgba(0,0,0,0.6)]">
+            <button
+              type="button"
+              onClick={() => void handleLeaveFullscreen()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[1.2rem] font-mono text-[10px] uppercase tracking-widest text-white/45 hover:text-white/75 transition-colors"
+              aria-label="Leave fullscreen"
+            >
+              <Minimize size={12} />
+              <span>Windowed</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExitSession()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[1.2rem] font-mono text-[10px] uppercase tracking-widest text-white/45 hover:text-white/75 transition-colors"
+              aria-label="Exit session"
+            >
+              <X size={12} />
+              <span>Exit</span>
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };

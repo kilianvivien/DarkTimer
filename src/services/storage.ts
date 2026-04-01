@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import { normalizeRecipe, type DevRecipe } from './recipe';
+import { normalizeRecipe, type DevRecipe, type Session, type SessionStatus } from './recipe';
 import type { Preset } from './presetTypes';
 import {
   DEFAULT_SETTINGS,
@@ -9,7 +9,7 @@ import {
 } from './userSettings';
 
 const DB_NAME = 'darktimer-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const SETTINGS_KEY = 'user';
 const ENCRYPTED_API_VAULT_KEY = 'apiKeys';
 
@@ -18,7 +18,7 @@ const LEGACY_PRESETS_KEY = 'darktimer_presets';
 const LEGACY_GEMINI_KEY = 'darktimer_gemini_key';
 const LEGACY_MISTRAL_KEY = 'darktimer_mistral_key';
 
-type StorageTopic = 'settings' | 'presets';
+type StorageTopic = 'settings' | 'presets' | 'sessions';
 
 interface SettingsRecord {
   key: typeof SETTINGS_KEY;
@@ -39,17 +39,6 @@ export interface EncryptedApiKeyVaultRecord {
   ciphertext: string;
 }
 
-interface SessionRecord {
-  id: string;
-  startTime: number;
-  endTime: number;
-  film: string;
-  status: 'completed' | 'partial' | 'aborted';
-  recipe: DevRecipe;
-  phasesCompleted: number;
-  note?: string;
-}
-
 interface DarkTimerDB extends DBSchema {
   presets: {
     key: string;
@@ -66,7 +55,7 @@ interface DarkTimerDB extends DBSchema {
   };
   sessions: {
     key: string;
-    value: SessionRecord;
+    value: Session;
     indexes: {
       startTime: number;
       film: string;
@@ -85,6 +74,7 @@ interface DarkTimerDB extends DBSchema {
 const listeners: Record<StorageTopic, Set<() => void>> = {
   settings: new Set(),
   presets: new Set(),
+  sessions: new Set(),
 };
 
 let dbPromise: Promise<IDBPDatabase<DarkTimerDB>> | null = null;
@@ -93,7 +83,7 @@ let initPromise: Promise<void> | null = null;
 function getDb(): Promise<IDBPDatabase<DarkTimerDB>> {
   if (!dbPromise) {
     dbPromise = openDB<DarkTimerDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion, _newVersion, transaction) {
         if (!db.objectStoreNames.contains('presets')) {
           const presets = db.createObjectStore('presets', { keyPath: 'id' });
           presets.createIndex('film', 'film');
@@ -108,7 +98,13 @@ function getDb(): Promise<IDBPDatabase<DarkTimerDB>> {
         if (!db.objectStoreNames.contains('sessions')) {
           const sessions = db.createObjectStore('sessions', { keyPath: 'id' });
           sessions.createIndex('startTime', 'startTime');
-          sessions.createIndex('film', 'film');
+          sessions.createIndex('film', 'recipe.film');
+        } else if (oldVersion < 3) {
+          const sessions = transaction.objectStore('sessions');
+          if (sessions.indexNames.contains('film')) {
+            sessions.deleteIndex('film');
+          }
+          sessions.createIndex('film', 'recipe.film');
         }
 
         if (!db.objectStoreNames.contains('apiKeys')) {
@@ -150,6 +146,40 @@ function normalizePreset(preset: unknown): Preset {
       typeof rawCreatedAt === 'number' && Number.isFinite(rawCreatedAt)
         ? rawCreatedAt
         : Date.now(),
+  };
+}
+
+function normalizeSessionStatus(value: unknown): SessionStatus {
+  if (value === 'completed' || value === 'partial' || value === 'aborted') {
+    return value;
+  }
+
+  return 'aborted';
+}
+
+function normalizeSession(session: unknown): Session {
+  const raw = typeof session === 'object' && session !== null ? session : {};
+  const rawId = 'id' in raw ? raw.id : undefined;
+  const rawRecipe = 'recipe' in raw ? raw.recipe : undefined;
+  const rawStartTime = 'startTime' in raw ? raw.startTime : undefined;
+  const rawEndTime = 'endTime' in raw ? raw.endTime : undefined;
+  const rawStatus = 'status' in raw ? raw.status : undefined;
+  const rawPhasesCompleted = 'phasesCompleted' in raw ? raw.phasesCompleted : undefined;
+  const startTime =
+    typeof rawStartTime === 'number' && Number.isFinite(rawStartTime) ? rawStartTime : Date.now();
+  const endTime =
+    typeof rawEndTime === 'number' && Number.isFinite(rawEndTime) ? rawEndTime : startTime;
+
+  return {
+    id: typeof rawId === 'string' && rawId.trim() ? rawId : crypto.randomUUID(),
+    recipe: normalizeRecipe(rawRecipe),
+    startTime,
+    endTime,
+    status: normalizeSessionStatus(rawStatus),
+    phasesCompleted:
+      typeof rawPhasesCompleted === 'number' && Number.isFinite(rawPhasesCompleted)
+        ? Math.max(0, Math.round(rawPhasesCompleted))
+        : 0,
   };
 }
 
@@ -311,6 +341,26 @@ export async function saveStoredPreset(recipe: DevRecipe): Promise<Preset> {
   return preset;
 }
 
+export async function updateStoredPreset(id: string, recipe: DevRecipe): Promise<Preset> {
+  await initStorage();
+  const db = await getDb();
+  const existing = await db.get('presets', id);
+  const normalizedRecipe = normalizeRecipe(recipe);
+  const preset: Preset = {
+    ...normalizedRecipe,
+    id,
+    createdAt:
+      typeof existing?.createdAt === 'number' && Number.isFinite(existing.createdAt)
+        ? existing.createdAt
+        : Date.now(),
+  };
+
+  await db.put('presets', preset);
+  emit('presets');
+
+  return preset;
+}
+
 export async function deleteStoredPreset(id: string): Promise<void> {
   await initStorage();
   const db = await getDb();
@@ -318,9 +368,37 @@ export async function deleteStoredPreset(id: string): Promise<void> {
   emit('presets');
 }
 
+export async function getStoredSessions(): Promise<Session[]> {
+  await initStorage();
+  const db = await getDb();
+  const sessions = await db.getAll('sessions');
+
+  return sessions
+    .map((session) => normalizeSession(session))
+    .sort((left, right) => right.startTime - left.startTime);
+}
+
+export async function saveStoredSession(session: Session): Promise<Session> {
+  const normalized = normalizeSession(session);
+  await initStorage();
+  const db = await getDb();
+  await db.put('sessions', normalized);
+  emit('sessions');
+
+  return normalized;
+}
+
+export async function clearStoredSessions(): Promise<void> {
+  await initStorage();
+  const db = await getDb();
+  await db.clear('sessions');
+  emit('sessions');
+}
+
 export async function __resetStorageForTests(): Promise<void> {
   listeners.settings.clear();
   listeners.presets.clear();
+  listeners.sessions.clear();
 
   if (dbPromise) {
     const db = await dbPromise.catch(() => null);

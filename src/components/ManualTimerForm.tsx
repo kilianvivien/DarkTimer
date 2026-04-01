@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Play } from 'lucide-react';
 import {
   AgitationMode,
@@ -10,17 +10,28 @@ import {
 } from '../services/recipe';
 import type { UserSettings } from '../services/userSettings';
 import { getDefaultTemperatureForMode } from '../services/settings';
+import {
+  DEVELOPER_OPTIONS,
+  DILUTION_OPTIONS,
+  FILM_STOCK_OPTIONS,
+  ISO_OPTIONS,
+  filterCatalogByProcessMode,
+} from '../services/searchCatalog';
+import type { Preset } from '../services/presetTypes';
 import { ProcessModeSwitch } from './ProcessModeSwitch';
+import { SearchableField } from './SearchableField';
 import { TemperatureInput } from './TemperatureInput';
 
 interface ManualTimerFormProps {
+  editingPreset?: Preset | null;
+  onCancelEdit?: () => void;
   onStart: (recipe: DevRecipe) => void;
   onSavePreset: (recipe: DevRecipe) => Promise<void>;
+  onUpdatePreset?: (id: string, recipe: DevRecipe) => Promise<void>;
   settings: UserSettings;
 }
 
 const AGITATION_OPTIONS: AgitationMode[] = ['every-60s', 'every-30s', 'stand'];
-const ISO_OPTIONS = [1, 2, 3, 6, 12, 25, 50, 64, 100, 200, 250, 320, 400, 800, 1600, 3200];
 
 const createBwPhases = (s: UserSettings): DevPhase[] => [
   { name: 'Developer', duration: s.defaultBwDeveloper, agitationMode: 'every-60s' },
@@ -35,15 +46,80 @@ const createColorPhases = (s: UserSettings): DevPhase[] => [
   { name: 'Wash', duration: s.defaultColorWash, agitationMode: 'stand' },
 ];
 
-export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSavePreset, settings }) => {
-  const [film, setFilm] = useState('');
-  const [developer, setDeveloper] = useState('');
-  const [dilution, setDilution] = useState('');
-  const [iso, setIso] = useState(400);
-  const [processMode, setProcessMode] = useState<ProcessMode>('bw');
-  const [tempC, setTempC] = useState(() => getDefaultTemperatureForMode('bw', settings));
-  const [phases, setPhases] = useState<DevPhase[]>(() => createBwPhases(settings));
+interface ManualFormState {
+  film: string;
+  developer: string;
+  dilution: string;
+  iso: number;
+  processMode: ProcessMode;
+  tempC: number;
+  phases: DevPhase[];
+}
+
+function clonePhases(phases: DevPhase[]): DevPhase[] {
+  return phases.map((phase) => ({ ...phase }));
+}
+
+function buildInitialFormState(settings: UserSettings, preset?: Preset | null): ManualFormState {
+  if (!preset) {
+    return {
+      film: '',
+      developer: '',
+      dilution: '',
+      iso: 400,
+      processMode: 'bw',
+      tempC: getDefaultTemperatureForMode('bw', settings),
+      phases: createBwPhases(settings),
+    };
+  }
+
+  return {
+    film: preset.film,
+    developer: preset.developer,
+    dilution: preset.dilution === 'N/A' ? '' : preset.dilution,
+    iso: preset.iso,
+    processMode: preset.processMode,
+    tempC: preset.tempC,
+    phases: clonePhases(preset.phases),
+  };
+}
+
+export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({
+  editingPreset = null,
+  onCancelEdit,
+  onStart,
+  onSavePreset,
+  onUpdatePreset,
+  settings,
+}) => {
+  const [film, setFilm] = useState(() => buildInitialFormState(settings, editingPreset).film);
+  const [developer, setDeveloper] = useState(() => buildInitialFormState(settings, editingPreset).developer);
+  const [dilution, setDilution] = useState(() => buildInitialFormState(settings, editingPreset).dilution);
+  const [iso, setIso] = useState(() => buildInitialFormState(settings, editingPreset).iso);
+  const [processMode, setProcessMode] = useState<ProcessMode>(() => buildInitialFormState(settings, editingPreset).processMode);
+  const [tempC, setTempC] = useState(() => buildInitialFormState(settings, editingPreset).tempC);
+  const [phases, setPhases] = useState<DevPhase[]>(() => buildInitialFormState(settings, editingPreset).phases);
   const [isSavingPreset, setIsSavingPreset] = useState(false);
+  const filmOptions = useMemo(
+    () => filterCatalogByProcessMode(FILM_STOCK_OPTIONS, processMode),
+    [processMode],
+  );
+  const developerOptions = useMemo(
+    () => filterCatalogByProcessMode(DEVELOPER_OPTIONS, processMode),
+    [processMode],
+  );
+  const isEditing = Boolean(editingPreset);
+
+  useEffect(() => {
+    const nextState = buildInitialFormState(settings, editingPreset);
+    setFilm(nextState.film);
+    setDeveloper(nextState.developer);
+    setDilution(nextState.dilution);
+    setIso(nextState.iso);
+    setProcessMode(nextState.processMode);
+    setTempC(nextState.tempC);
+    setPhases(nextState.phases);
+  }, [editingPreset, settings]);
 
   const handleProcessModeChange = (nextMode: ProcessMode) => {
     setProcessMode(nextMode);
@@ -106,9 +182,9 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
   };
 
   const buildRecipe = (): DevRecipe => ({
-    film: film || 'Custom Film',
-    developer: developer || 'Custom Dev',
-    dilution: dilution || 'N/A',
+    film: film.trim() || 'Custom Film',
+    developer: developer.trim() || 'Custom Dev',
+    dilution: dilution.trim() || 'N/A',
     iso,
     tempC,
     processMode,
@@ -132,6 +208,23 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-8">
       <div className="utilitarian-border bg-dark-panel p-5 md:p-6 space-y-4">
+        {isEditing ? (
+          <div className="flex flex-col gap-3 border-b border-dark-border pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-1">
+              <p className="mono-label text-accent-red">Editing preset</p>
+              <p className="text-sm text-ui-gray">Update the saved recipe, then overwrite it in your library.</p>
+            </div>
+            {onCancelEdit ? (
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                className="utilitarian-button w-full shrink-0 whitespace-nowrap px-3 py-2 sm:w-auto sm:min-w-[6.5rem]"
+              >
+                Cancel
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="grid grid-cols-1 md:grid-cols-[1.7fr_0.8fr] gap-4 items-end">
           <ProcessModeSwitch value={processMode} onChange={handleProcessModeChange} />
           <div className="space-y-1">
@@ -142,42 +235,40 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="space-y-1 col-span-2 md:col-span-1 min-w-0">
-          <label className="mono-label">Film Stock</label>
-          <input
-            type="text"
+        <div className="col-span-2 md:col-span-1 min-w-0">
+          <SearchableField
+            label="Film Stock"
+            options={filmOptions}
+            placeholder={processMode === 'bw' ? 'e.g. HP5 Plus' : 'e.g. Portra 400'}
             value={film}
-            onChange={(e) => setFilm(e.target.value)}
-            placeholder="e.g. HP5 Plus"
-            className="utilitarian-input w-full"
+            onChange={setFilm}
           />
         </div>
-        <div className="space-y-1 col-span-2 md:col-span-1 min-w-0">
-          <label className="mono-label">Developer</label>
-          <input
-            type="text"
+        <div className="col-span-2 md:col-span-1 min-w-0">
+          <SearchableField
+            label="Developer"
+            options={developerOptions}
+            placeholder={processMode === 'bw' ? 'e.g. ID-11' : 'e.g. C-41'}
             value={developer}
-            onChange={(e) => setDeveloper(e.target.value)}
-            placeholder="e.g. ID-11"
-            className="utilitarian-input w-full"
+            onChange={setDeveloper}
           />
         </div>
-        <div className="space-y-1">
-          <label className="mono-label">Dilution</label>
-          <input
-            type="text"
-            value={dilution}
-            onChange={(e) => setDilution(e.target.value)}
+        <div className="min-w-0">
+          <SearchableField
+            label="Dilution"
+            options={DILUTION_OPTIONS}
             placeholder="e.g. 1+1"
-            className="utilitarian-input w-full"
+            value={dilution}
+            onChange={setDilution}
           />
         </div>
         <div className="space-y-1">
-          <label className="mono-label">ISO</label>
+          <label htmlFor="manual-iso" className="mono-label">ISO</label>
           <select
+            id="manual-iso"
             value={iso}
-            onChange={(e) => setIso(parseInt(e.target.value))}
-            className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
+            onChange={(e) => setIso(parseInt(e.target.value, 10))}
+            className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
           >
             {ISO_OPTIONS.map((v) => (
               <option key={v} value={v}>{v}</option>
@@ -213,13 +304,14 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                       type="text"
                       value={phase.name}
                       onChange={(e) => updatePhase(i, 'name', e.target.value)}
-                      className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full font-mono text-sm"
+                      className="mobile-form-control-inline bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-full font-mono"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => removePhase(i)}
-                    className="text-ui-gray hover:text-accent-red p-1 md:order-last"
+                    className="press-feedback text-ui-gray hover:text-accent-red p-1 md:order-last"
+                    aria-label={`Remove ${phase.name || 'phase'}`}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -233,7 +325,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                         type="number"
                         value={mins}
                         onChange={(e) => updatePhaseTime(i, 'min', parseInt(e.target.value) || 0)}
-                        className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono text-sm"
+                        className="mobile-form-control-inline bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono"
                         min="0"
                       />
                       <span className="text-[10px] font-mono text-ui-gray uppercase">m</span>
@@ -243,7 +335,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                         type="number"
                         value={secs}
                         onChange={(e) => updatePhaseTime(i, 'sec', parseInt(e.target.value) || 0)}
-                        className="bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono text-sm"
+                        className="mobile-form-control-inline bg-transparent border-b border-dark-border focus:border-white outline-none px-1 w-12 text-center font-mono"
                         min="0"
                         max="59"
                       />
@@ -255,7 +347,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                     <select
                       value={phase.agitationMode ?? 'stand'}
                       onChange={(e) => updatePhase(i, 'agitationMode', e.target.value as AgitationMode)}
-                      className="utilitarian-input w-full bg-dark-panel px-3 py-2 text-xs"
+                      className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
                     >
                       {AGITATION_OPTIONS.map((option) => (
                         <option key={option} value={option}>
@@ -278,14 +370,18 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
           onClick={async () => {
             setIsSavingPreset(true);
             try {
-              await onSavePreset(buildRecipe());
+              if (isEditing && editingPreset && onUpdatePreset) {
+                await onUpdatePreset(editingPreset.id, buildRecipe());
+              } else {
+                await onSavePreset(buildRecipe());
+              }
             } finally {
               setIsSavingPreset(false);
             }
           }}
           className="flex-1 utilitarian-button py-4 hover:bg-white hover:text-black disabled:opacity-60"
         >
-          {isSavingPreset ? 'Saving…' : 'Save to Library'}
+          {isSavingPreset ? 'Saving…' : isEditing ? 'Update Preset' : 'Save to Library'}
         </button>
         <button
           type="submit"

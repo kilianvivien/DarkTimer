@@ -1,13 +1,15 @@
 import React, { Suspense, lazy, startTransition, useCallback, useEffect, useState } from 'react';
 import { ManualTimerForm } from './components/ManualTimerForm';
-import { DevRecipe } from './services/recipe';
-import { deletePreset, savePreset, type Preset } from './services/presets';
-import { Camera, Sparkles, Info, Library, Settings, Sliders, Github } from 'lucide-react';
+import { DevRecipe, type Session } from './services/recipe';
+import { deletePreset, savePreset, updatePreset } from './services/presets';
+import type { Preset } from './services/presets';
+import { Camera, Sparkles, Info, Library, Settings, Sliders, Github, History as HistoryIcon } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
 import { DEFAULT_SETTINGS, saveAiProvider, saveSettings } from './services/settings';
-import { useStorageReady, useStoredPresets, useStoredSettings } from './hooks/useStoredData';
+import { useStorageReady, useStoredPresets, useStoredSessions, useStoredSettings } from './hooks/useStoredData';
 import { useApiKeySession } from './hooks/useApiKeySession';
+import { clearStoredSessions, saveStoredSession } from './services/storage';
 import type { AIProvider, UserSettings } from './services/userSettings';
 import {
   clearEncryptedApiKeys,
@@ -18,7 +20,7 @@ import {
 } from './services/secretStorage';
 import type { SettingsSaveRequest } from './components/SettingsMenu';
 
-type View = 'manual' | 'ai' | 'library' | 'settings' | 'timer';
+type View = 'manual' | 'ai' | 'library' | 'history' | 'settings' | 'timer';
 type ToastTone = 'success' | 'error';
 
 interface ToastState {
@@ -36,6 +38,9 @@ const PresetLibrary = lazy(() =>
 const SettingsMenu = lazy(() =>
   import('./components/SettingsMenu').then((module) => ({ default: module.SettingsMenu })),
 );
+const HistoryView = lazy(() =>
+  import('./components/HistoryView').then((module) => ({ default: module.HistoryView })),
+);
 const SessionView = lazy(() =>
   import('./components/SessionView').then((module) => ({ default: module.SessionView })),
 );
@@ -44,9 +49,10 @@ const NAV_ITEMS: { view: View; label: string; Icon: React.FC<{ size?: number; cl
   { view: 'manual',   label: 'Manual',   Icon: Sliders },
   { view: 'ai',       label: 'AI',       Icon: Sparkles },
   { view: 'library',  label: 'Library',  Icon: Library },
+  { view: 'history',  label: 'History',  Icon: HistoryIcon },
   { view: 'settings', label: 'Settings', Icon: Settings },
 ];
-const SWIPEABLE_VIEWS: View[] = ['manual', 'ai', 'library', 'settings'];
+const SWIPEABLE_VIEWS: View[] = ['manual', 'ai', 'library', 'history', 'settings'];
 
 function getViewIndex(view: View): number {
   return SWIPEABLE_VIEWS.indexOf(view);
@@ -62,6 +68,7 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 export default function App() {
   const [recipe, setRecipe] = useState<DevRecipe | null>(null);
+  const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
   const [view, setView] = useState<View>('manual');
   const [showHelp, setShowHelp] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -70,6 +77,7 @@ export default function App() {
   const storageReady = useStorageReady();
   const { data: settings, isLoading: settingsLoading } = useStoredSettings(DEFAULT_SETTINGS);
   const { data: presets, isLoading: presetsLoading } = useStoredPresets();
+  const { data: sessions, isLoading: sessionsLoading } = useStoredSessions();
   const {
     apiKeys,
     hasEncryptedApiKeys,
@@ -77,7 +85,7 @@ export default function App() {
     isReady: apiKeysReady,
     migrationNotice,
   } = useApiKeySession();
-  const appReady = storageReady && !settingsLoading && !presetsLoading && apiKeysReady;
+  const appReady = storageReady && !settingsLoading && !presetsLoading && !sessionsLoading && apiKeysReady;
 
   const notify = useCallback((message: string, tone: ToastTone = 'success') => {
     setToast({
@@ -111,12 +119,14 @@ export default function App() {
   }, [migrationNotice, notify]);
 
   const handleStartTimer = (newRecipe: DevRecipe) => {
+    setEditingPreset(null);
     setRecipe(newRecipe);
     setNavDirection(1);
     startTransition(() => setView('timer'));
   };
 
   const reset = () => {
+    setEditingPreset(null);
     setRecipe(null);
     setNavDirection(-1);
     startTransition(() => setView('manual'));
@@ -156,12 +166,34 @@ export default function App() {
 
   const handleSavePreset = async (nextRecipe: DevRecipe) => {
     await savePreset(nextRecipe);
+    setEditingPreset(null);
     notify('Recipe saved to library.');
+  };
+
+  const handleUpdatePreset = async (id: string, nextRecipe: DevRecipe) => {
+    await updatePreset(id, nextRecipe);
+    setEditingPreset(null);
+    notify('Preset updated.');
+    if (view !== 'manual') {
+      setNavDirection(-1);
+      startTransition(() => setView('manual'));
+    }
   };
 
   const handleDeletePreset = async (id: string) => {
     await deletePreset(id);
+    if (editingPreset?.id === id) {
+      setEditingPreset(null);
+    }
     notify('Preset removed from library.');
+  };
+
+  const handleEditPreset = (preset: Preset) => {
+    setEditingPreset(preset);
+    const currentIndex = getViewIndex(view === 'timer' ? 'library' : view);
+    const nextIndex = getViewIndex('manual');
+    setNavDirection(nextIndex > currentIndex ? 1 : -1);
+    startTransition(() => setView('manual'));
   };
 
   const handleSaveSettings = async ({
@@ -188,8 +220,11 @@ export default function App() {
       await saveEncryptedApiKeys(passphrase, normalizedApiKeys);
     }
 
-    notify('Settings saved.');
-    changeView('manual');
+    notify('API key settings saved.');
+  };
+
+  const handleUpdateSettings = async (nextSettings: UserSettings) => {
+    await saveSettings(nextSettings);
   };
 
   const handleUnlockSavedKeys = async (passphrase: string) => {
@@ -207,6 +242,25 @@ export default function App() {
 
   const handleProviderChange = async (provider: AIProvider) => {
     await saveAiProvider(provider);
+  };
+
+  const handleSaveSession = async (session: Session) => {
+    try {
+      await saveStoredSession(session);
+    } catch (error) {
+      console.error('Failed to save session history entry:', error);
+      notify('Session history could not be saved.', 'error');
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await clearStoredSessions();
+      notify('Session history cleared.');
+    } catch (error) {
+      console.error('Failed to clear session history:', error);
+      throw error;
+    }
   };
 
   const activeView = view === 'timer' ? 'manual' : view;
@@ -227,10 +281,15 @@ export default function App() {
       {/* Header */}
       <header className="border-b border-dark-border bg-dark-bg sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div className="max-w-5xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={reset}>
+          <button
+            type="button"
+            className="press-feedback flex items-center space-x-2 cursor-pointer text-left"
+            onClick={reset}
+            aria-label="Return to manual timer"
+          >
             <Camera size={16} className="text-accent-red" />
             <span className="font-mono font-bold tracking-tighter text-sm uppercase">DARK<span className="text-accent-red">TIMER</span></span>
-          </div>
+          </button>
 
           <div className="flex items-center">
             {/* Desktop nav — hidden on mobile */}
@@ -241,7 +300,7 @@ export default function App() {
                   onClick={() => changeView(v)}
                   disabled={view === 'timer'}
                   className={cn(
-                    "px-4 h-14 font-mono text-xs uppercase tracking-widest transition-all border-b-2",
+                    "press-feedback px-4 h-14 font-mono text-xs uppercase tracking-widest transition-all border-b-2",
                     activeView === v ? "border-accent-red text-white" : "border-transparent text-ui-gray hover:text-white",
                     view === 'timer' && "opacity-30 cursor-not-allowed"
                   )}
@@ -263,7 +322,7 @@ export default function App() {
             {/* Info button — always visible */}
             <button
               onClick={() => setShowHelp(true)}
-              className="p-2 text-ui-gray hover:text-white transition-colors"
+              className="press-feedback p-2 text-ui-gray hover:text-white transition-colors"
               aria-label="How to use"
             >
               <Info size={16} />
@@ -297,8 +356,11 @@ export default function App() {
                 <p className="mono-label">Input your own development parameters</p>
               </div>
               <ManualTimerForm
+                editingPreset={editingPreset}
+                onCancelEdit={() => setEditingPreset(null)}
                 onStart={handleStartTimer}
                 onSavePreset={handleSavePreset}
+                onUpdatePreset={handleUpdatePreset}
                 settings={settings}
               />
             </motion.div>
@@ -344,6 +406,7 @@ export default function App() {
                   presets={presets}
                   onSelect={handleStartTimer}
                   onDelete={handleDeletePreset}
+                  onEdit={handleEditPreset}
                 />
               </motion.div>
             </Suspense>
@@ -364,11 +427,30 @@ export default function App() {
                   apiKeys={apiKeys}
                   hasEncryptedApiKeys={hasEncryptedApiKeys}
                   isVaultLocked={isApiKeyVaultLocked}
+                  onClearHistory={handleClearHistory}
                   onForgetSavedKeys={handleForgetSavedKeys}
+                  onSettingsChange={handleUpdateSettings}
                   onSave={handleSaveSettings}
                   onUnlockSavedKeys={handleUnlockSavedKeys}
+                  sessionCount={sessions.length}
                   settings={settings}
                 />
+              </motion.div>
+            </Suspense>
+          )}
+
+          {view === 'history' && (
+            <Suspense fallback={<ViewLoader label="Loading history" />}>
+              <motion.div
+                key="history"
+                {...viewMotion}
+                className="w-full flex flex-col items-center space-y-6 md:space-y-8"
+              >
+                <div className="text-center space-y-2">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">History</h1>
+                  <p className="mono-label">Your recent development sessions</p>
+                </div>
+                <HistoryView sessions={sessions} />
               </motion.div>
             </Suspense>
           )}
@@ -382,7 +464,12 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="w-full"
               >
-                <SessionView recipe={recipe} onExit={reset} settings={settings} />
+                <SessionView
+                  recipe={recipe}
+                  onExit={reset}
+                  onSaveSession={handleSaveSession}
+                  settings={settings}
+                />
               </motion.div>
             </Suspense>
           )}
@@ -414,7 +501,7 @@ export default function App() {
                 onClick={() => changeView(v)}
                 disabled={view === 'timer'}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1.5 flex-1 px-2 py-2.5 rounded-[1.2rem] transition-all duration-200",
+                  "press-feedback flex flex-col items-center justify-center gap-1.5 flex-1 px-2 py-2.5 rounded-[1.2rem] transition-all duration-200",
                   activeView === v
                     ? "bg-white text-black shadow-[0_2px_12px_rgba(0,0,0,0.3)]"
                     : "text-white/35 hover:text-white/60",
@@ -449,7 +536,14 @@ export default function App() {
             >
               <div className="flex justify-between items-start">
                 <h2 className="font-mono text-sm uppercase tracking-widest text-white">How to use DarkTimer</h2>
-                <button onClick={() => setShowHelp(false)} className="text-ui-gray hover:text-white transition-colors font-mono text-sm leading-none">✕</button>
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(false)}
+                  className="press-feedback text-ui-gray hover:text-white transition-colors font-mono text-sm leading-none"
+                  aria-label="Close help"
+                >
+                  ✕
+                </button>
               </div>
 
               <div className="space-y-5 text-sm font-mono text-ui-gray leading-relaxed">
@@ -466,8 +560,12 @@ export default function App() {
                   <p>Save recipes from Manual or AI mode to keep them here. Tap any preset to jump straight into a timer session.</p>
                 </div>
                 <div className="space-y-1">
+                  <p className="text-white uppercase tracking-widest text-xs">History</p>
+                  <p>DarkTimer saves completed and interrupted timer runs locally so you can review recent development sessions on-device.</p>
+                </div>
+                <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Settings</p>
-                  <p>Set your development defaults, choose your AI provider, add your API keys, and manage notifications.</p>
+                  <p>Set your development defaults, choose your AI provider, add your API keys, manage notifications, and clear session history.</p>
                 </div>
               </div>
             </motion.div>

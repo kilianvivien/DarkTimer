@@ -1,16 +1,22 @@
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
-import { DevRecipe, formatTemperature, getProcessLabel } from '../services/recipe';
-import { Timer } from './Timer';
+import { DevRecipe, formatTemperature, getProcessLabel, type Session } from '../services/recipe';
+import { Timer, type TimerSessionResult } from './Timer';
 import type { UserSettings } from '../services/userSettings';
 
 interface SessionViewProps {
   recipe: DevRecipe | null;
   onExit: () => void;
+  onSaveSession: (session: Session) => Promise<void>;
   settings: UserSettings;
 }
 
-export const SessionView: React.FC<SessionViewProps> = ({ recipe, onExit, settings }) => {
+export const SessionView: React.FC<SessionViewProps> = ({
+  recipe,
+  onExit,
+  onSaveSession,
+  settings,
+}) => {
   const [sessionKey, setSessionKey] = React.useState(0);
   const [isComplete, setIsComplete] = React.useState(false);
 
@@ -22,6 +28,17 @@ export const SessionView: React.FC<SessionViewProps> = ({ recipe, onExit, settin
   if (!recipe) {
     return null;
   }
+
+  const handleSessionEnd = async (result: TimerSessionResult) => {
+    await onSaveSession({
+      id: crypto.randomUUID(),
+      recipe,
+      startTime: result.startTime,
+      endTime: result.endTime,
+      status: result.status,
+      phasesCompleted: result.phasesCompleted,
+    });
+  };
 
   return (
     <div className="w-full flex flex-col landscape:flex-col gap-4 md:gap-8">
@@ -105,6 +122,7 @@ export const SessionView: React.FC<SessionViewProps> = ({ recipe, onExit, settin
             phases={recipe.phases}
             onComplete={() => setIsComplete(true)}
             onExitSession={onExit}
+            onSessionEnd={handleSessionEnd}
             settings={settings}
           />
         </div>

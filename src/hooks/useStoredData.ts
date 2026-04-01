@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Preset } from '../services/presetTypes';
+import type { Session } from '../services/recipe';
 import {
   initStorage,
   subscribeToStorage,
   getStoredPresets,
+  getStoredSessions,
   getStoredSettings,
   saveStoredSettings,
 } from '../services/storage';
@@ -12,6 +14,7 @@ import type { UserSettings } from '../services/userSettings';
 interface AsyncState<T> {
   data: T;
   isLoading: boolean;
+  refresh: () => Promise<void>;
 }
 
 function useStoredResource<T>(
@@ -19,36 +22,46 @@ function useStoredResource<T>(
   subscribe: (listener: () => void) => () => void,
   fallback: T,
 ): AsyncState<T> {
+  const isMountedRef = useRef(false);
   const [state, setState] = useState<AsyncState<T>>({
     data: fallback,
     isLoading: true,
+    refresh: async () => {},
   });
 
+  const refresh = useCallback(async () => {
+    const next = await load();
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      data: next,
+      isLoading: false,
+    }));
+  }, [load]);
+
   useEffect(() => {
-    let active = true;
+    isMountedRef.current = true;
 
-    const refresh = async () => {
-      const next = await load();
-      if (!active) {
-        return;
-      }
-
-      setState({
-        data: next,
-        isLoading: false,
-      });
-    };
-
-    refresh();
+    void refresh();
     const unsubscribe = subscribe(() => {
       void refresh();
     });
 
     return () => {
-      active = false;
+      isMountedRef.current = false;
       unsubscribe();
     };
-  }, [load, subscribe]);
+  }, [refresh, subscribe]);
+
+  useEffect(() => {
+    setState((current) => ({
+      ...current,
+      refresh,
+    }));
+  }, [refresh]);
 
   return state;
 }
@@ -85,6 +98,14 @@ export function useStoredPresets(): AsyncState<Preset[]> {
   return useStoredResource(
     useCallback(() => getStoredPresets(), []),
     useCallback((listener: () => void) => subscribeToStorage('presets', listener), []),
+    [],
+  );
+}
+
+export function useStoredSessions(): AsyncState<Session[]> {
+  return useStoredResource(
+    useCallback(() => getStoredSessions(), []),
+    useCallback((listener: () => void) => subscribeToStorage('sessions', listener), []),
     [],
   );
 }

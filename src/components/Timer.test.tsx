@@ -30,6 +30,7 @@ describe('Timer', () => {
         phases={phases}
         onComplete={vi.fn()}
         onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
         settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 5 }}
       />,
     );
@@ -45,12 +46,14 @@ describe('Timer', () => {
 
   it('supports pause, reset, skip, and completion callbacks', async () => {
     const onComplete = vi.fn();
+    const onSessionEnd = vi.fn();
 
     render(
       <Timer
         phases={phases}
         onComplete={onComplete}
         onExitSession={vi.fn()}
+        onSessionEnd={onSessionEnd}
         settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0, notificationsEnabled: true }}
       />,
     );
@@ -83,6 +86,9 @@ describe('Timer', () => {
     });
 
     expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onSessionEnd).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'completed', phasesCompleted: 2 }),
+    );
     expect(showNotificationMock).toHaveBeenCalledWith('Development complete', 'All phases finished.');
   });
 
@@ -196,6 +202,7 @@ describe('Timer', () => {
         phases={[{ name: 'Developer', duration: 1, agitationMode: 'stand' as const }]}
         onComplete={vi.fn()}
         onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
         settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
       />,
     );
@@ -207,5 +214,56 @@ describe('Timer', () => {
     });
 
     expect(oscillatorStart).not.toHaveBeenCalled();
+  });
+
+  it('reports an aborted session when exiting before any timer progress', async () => {
+    const onSessionEnd = vi.fn();
+    const onExitSession = vi.fn();
+
+    render(
+      <Timer
+        phases={[{ name: 'Developer', duration: 3, agitationMode: 'stand' as const }]}
+        onComplete={vi.fn()}
+        onExitSession={onExitSession}
+        onSessionEnd={onSessionEnd}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /exit session/i }));
+    });
+
+    expect(onSessionEnd).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'aborted', phasesCompleted: 0 }),
+    );
+    expect(onExitSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a partial session when exiting after progress', async () => {
+    const onSessionEnd = vi.fn();
+
+    render(
+      <Timer
+        phases={[{ name: 'Developer', duration: 3, agitationMode: 'stand' as const }]}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={onSessionEnd}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /exit session/i }));
+    });
+
+    expect(onSessionEnd).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'partial', phasesCompleted: 0 }),
+    );
   });
 });
