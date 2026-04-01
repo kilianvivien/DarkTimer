@@ -132,6 +132,7 @@ describe('Timer', () => {
           phases={phases}
           onComplete={vi.fn()}
           onExitSession={vi.fn()}
+          onSessionEnd={vi.fn()}
           settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
         />,
       );
