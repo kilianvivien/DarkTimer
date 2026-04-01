@@ -134,4 +134,24 @@ describe('SettingsMenu', () => {
       'mobile-form-control-inline',
     );
   });
+
+  it('exposes collapsible sections and switches with accessible state and names', () => {
+    render(
+      <SettingsMenu
+        apiKeys={{ gemini: '', mistral: '' }}
+        hasEncryptedApiKeys={false}
+        isVaultLocked={false}
+        onForgetSavedKeys={vi.fn().mockResolvedValue(undefined)}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        onUnlockSavedKeys={vi.fn().mockResolvedValue(undefined)}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /black & white/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /color negative & slide/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('switch', { name: /enable notifications/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /flash overlay/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /vibration cues/i })).toBeInTheDocument();
+  });
 });

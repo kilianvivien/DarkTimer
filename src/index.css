@@ -64,6 +64,34 @@
   @apply px-4 py-2 border border-dark-border hover:border-white transition-all font-mono text-xs uppercase tracking-widest;
 }
 
+.utilitarian-button,
+.press-feedback {
+  transform: translateZ(0);
+  transition:
+    transform 160ms ease,
+    filter 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .utilitarian-button:active,
+  .press-feedback:active {
+    transform: scale(0.985);
+    filter: brightness(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .utilitarian-button:active,
+  .press-feedback:active {
+    filter: brightness(1.05);
+  }
+}
+
 .utilitarian-input {
   @apply bg-transparent border border-dark-border px-4 py-2 focus:outline-none focus:border-accent-red transition-all font-mono;
   font-size: 1rem;

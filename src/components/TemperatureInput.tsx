@@ -15,7 +15,7 @@ export const TemperatureInput: React.FC<TemperatureInputProps> = ({ value, onCha
       <button
         type="button"
         onClick={decrement}
-        className="px-3 text-ui-gray hover:text-white hover:bg-[#111] transition-colors font-mono text-base border-r border-dark-border"
+        className="press-feedback px-3 text-ui-gray hover:text-white hover:bg-[#111] transition-colors font-mono text-base border-r border-dark-border"
         aria-label="Decrease temperature"
       >
         −
@@ -30,7 +30,7 @@ export const TemperatureInput: React.FC<TemperatureInputProps> = ({ value, onCha
       <button
         type="button"
         onClick={increment}
-        className="px-3 text-ui-gray hover:text-white hover:bg-[#111] transition-colors font-mono text-base border-l border-dark-border"
+        className="press-feedback px-3 text-ui-gray hover:text-white hover:bg-[#111] transition-colors font-mono text-base border-l border-dark-border"
         aria-label="Increase temperature"
       >
         +

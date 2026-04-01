@@ -219,7 +219,8 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({ onStart, onSav
                   <button
                     type="button"
                     onClick={() => removePhase(i)}
-                    className="text-ui-gray hover:text-accent-red p-1 md:order-last"
+                    className="press-feedback text-ui-gray hover:text-accent-red p-1 md:order-last"
+                    aria-label={`Remove ${phase.name || 'phase'}`}
                   >
                     <Trash2 size={14} />
                   </button>

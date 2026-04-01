@@ -462,29 +462,41 @@ export const Timer: React.FC<TimerProps> = ({ phases, onComplete, onExitSession,
           <button
             onClick={toggleTimer}
             className={cn(
-              "w-full py-3 font-bold uppercase tracking-widest text-sm transition-all hidden landscape:block",
+              "press-feedback w-full py-3 font-bold uppercase tracking-widest text-sm transition-all hidden landscape:block",
               isActive ? "bg-dark-border text-white" : "bg-white text-black hover:bg-accent-red hover:text-white"
             )}
           >
             {countdown !== null ? 'Cancel' : isActive ? 'Pause' : 'Start'}
           </button>
           <div className="flex items-center justify-center landscape:justify-between space-x-3 landscape:space-x-0">
-            <button onClick={toggleMute} className="utilitarian-button p-3">
+            <button
+              onClick={toggleMute}
+              className="utilitarian-button p-3"
+              aria-label={isMuted ? 'Unmute timer sounds' : 'Mute timer sounds'}
+            >
               {isMuted ? <BellOff size={16} /> : <Bell size={16} />}
             </button>
-            <button onClick={resetTimer} className="utilitarian-button p-3">
+            <button
+              onClick={resetTimer}
+              className="utilitarian-button p-3"
+              aria-label="Reset current phase"
+            >
               <RotateCcw size={16} />
             </button>
             <button
               onClick={toggleTimer}
               className={cn(
-                "flex-1 landscape:hidden px-6 py-3 font-bold uppercase tracking-widest text-sm transition-all",
+                "press-feedback flex-1 landscape:hidden px-6 py-3 font-bold uppercase tracking-widest text-sm transition-all",
                 isActive ? "bg-dark-border text-white" : "bg-white text-black hover:bg-accent-red hover:text-white"
               )}
             >
               {countdown !== null ? 'Cancel' : isActive ? 'Pause' : 'Start'}
             </button>
-            <button onClick={skipPhase} className="utilitarian-button p-3">
+            <button
+              onClick={skipPhase}
+              className="utilitarian-button p-3"
+              aria-label="Skip current phase"
+            >
               <SkipForward size={16} />
             </button>
             {!isFullscreen && (

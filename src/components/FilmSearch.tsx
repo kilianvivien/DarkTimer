@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Sparkles, Loader2, Info, Plus, Settings, Search, CircleAlert } from 'lucide-react';
 import { getDevTimes, DevResponse } from '../services/ai';
 import { AnimatePresence, motion } from 'motion/react';
@@ -22,7 +22,19 @@ interface FilmSearchProps {
   settings: UserSettings;
 }
 
+interface SearchQuery {
+  film: string;
+  developer: string;
+  dilution: string;
+  iso: number;
+  tempC: number;
+  processMode: ProcessMode;
+}
+
 const ISO_OPTIONS = [1, 2, 3, 6, 12, 25, 50, 64, 100, 200, 250, 320, 400, 800, 1600, 3200];
+const MOBILE_BREAKPOINT = 768;
+const REFRESH_THRESHOLD_PX = 72;
+const MAX_PULL_DISTANCE_PX = 108;
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
   gemini: 'Gemini',
@@ -53,9 +65,15 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
   const [showMissingKeyWarning, setShowMissingKeyWarning] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [savingRecipeIndex, setSavingRecipeIndex] = useState<number | null>(null);
+  const [lastSubmittedQuery, setLastSubmittedQuery] = useState<SearchQuery | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isOffline, setIsOffline] = useState(() =>
     typeof navigator !== 'undefined' ? !navigator.onLine : false,
   );
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const pullActiveRef = useRef(false);
+  const pullDistanceRef = useRef(0);
 
   useEffect(() => {
     setProvider(settings.aiProvider);
@@ -85,56 +103,225 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
     void onProviderChange(nextProvider);
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const apiKey = apiKeys[provider]?.trim() ?? '';
+  const resetSearchUi = (preserveSearchedState = true) => {
+    setError('');
+    setResults(null);
+    setResultProvider(null);
+    setShowMissingKeyWarning(false);
+
+    if (!preserveSearchedState) {
+      setHasSearched(false);
+    }
+  };
+
+  const executeSearch = async (
+    query: SearchQuery,
+    nextProvider: AIProvider,
+    options: {
+      showKeyWarning?: boolean;
+      persistQuery?: boolean;
+      preserveSearchedState?: boolean;
+    } = {},
+  ) => {
+    const {
+      showKeyWarning = false,
+      persistQuery = true,
+      preserveSearchedState = true,
+    } = options;
+    const apiKey = apiKeys[nextProvider]?.trim() ?? '';
+
+    resetSearchUi(preserveSearchedState);
 
     if (!apiKey) {
-      setShowMissingKeyWarning(true);
-      setError(
-        hasEncryptedApiKeys && isVaultLocked
-          ? 'Unlock your saved API keys in Settings before using AI search.'
-          : '',
-      );
+      if (showKeyWarning) {
+        setShowMissingKeyWarning(true);
+        setError(
+          hasEncryptedApiKeys && isVaultLocked
+            ? 'Unlock your saved API keys in Settings before using AI search.'
+            : '',
+        );
+      }
       return;
     }
-    if (!film || !developer) {
+
+    if (!query.film || !query.developer) {
       setError('Enter at least a film and developer before asking AI.');
       return;
     }
+
     if (isOffline) {
       setError('AI lookup requires an internet connection.');
       return;
     }
 
     setLoading(true);
-    setError('');
-    setResults(null);
-    setResultProvider(null);
     setHasSearched(true);
-    
-    const response = await getDevTimes(
-      provider,
-      apiKey,
-      film,
-      developer,
-      String(iso),
-      tempC,
-      dilution,
-      processMode,
-    );
-    
-    if (response && response.options.length > 0) {
-      setResults(response);
-      setResultProvider(provider);
-    } else {
-      setError('No recipes found. Try adjusting parameters.');
+
+    if (persistQuery) {
+      setLastSubmittedQuery(query);
     }
-    setLoading(false);
+
+    try {
+      const response = await getDevTimes(
+        nextProvider,
+        apiKey,
+        query.film,
+        query.developer,
+        String(query.iso),
+        query.tempC,
+        query.dilution,
+        query.processMode,
+      );
+
+      if (response && response.options.length > 0) {
+        setResults(response);
+        setResultProvider(nextProvider);
+      } else {
+        setError('No recipes found. Try adjusting parameters.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPullState = () => {
+    touchStartRef.current = null;
+    pullActiveRef.current = false;
+    pullDistanceRef.current = 0;
+    setPullDistance(0);
+  };
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
+    if (
+      loading ||
+      isRefreshing ||
+      event.touches.length !== 1 ||
+      window.innerWidth >= MOBILE_BREAKPOINT ||
+      window.scrollY !== 0
+    ) {
+      resetPullState();
+      return;
+    }
+
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    pullActiveRef.current = false;
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLElement>) => {
+    if (!touchStartRef.current || loading || isRefreshing || window.innerWidth >= MOBILE_BREAKPOINT) {
+      return;
+    }
+
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+
+    if (deltaY <= 0 || window.scrollY !== 0) {
+      resetPullState();
+      return;
+    }
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      resetPullState();
+      return;
+    }
+
+    pullActiveRef.current = true;
+    const nextDistance = Math.min(MAX_PULL_DISTANCE_PX, deltaY * 0.5);
+    pullDistanceRef.current = nextDistance;
+    setPullDistance(nextDistance);
+    event.preventDefault();
+  };
+
+  const handleTouchEnd = async () => {
+    if (!pullActiveRef.current) {
+      resetPullState();
+      return;
+    }
+
+    const shouldRefresh = pullDistanceRef.current >= REFRESH_THRESHOLD_PX;
+    resetPullState();
+
+    if (!shouldRefresh || loading || isRefreshing) {
+      return;
+    }
+
+    resetSearchUi(false);
+
+    if (!lastSubmittedQuery || isOffline) {
+      return;
+    }
+
+    setIsRefreshing(true);
+
+    try {
+      await executeSearch(lastSubmittedQuery, provider, {
+        showKeyWarning: false,
+        persistQuery: false,
+        preserveSearchedState: false,
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const pullRefreshLabel = useMemo(() => {
+    if (isRefreshing) {
+      return `Retrying with ${PROVIDER_LABELS[provider]}`;
+    }
+
+    if (pullDistance >= REFRESH_THRESHOLD_PX) {
+      return lastSubmittedQuery && !isOffline ? `Release to retry with ${PROVIDER_LABELS[provider]}` : 'Release to clear';
+    }
+
+    return lastSubmittedQuery && !isOffline ? `Pull to retry with ${PROVIDER_LABELS[provider]}` : 'Pull to clear';
+  }, [isRefreshing, isOffline, lastSubmittedQuery, provider, pullDistance]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    await executeSearch(
+      {
+        film,
+        developer,
+        dilution,
+        iso,
+        tempC,
+        processMode,
+      },
+      provider,
+      { showKeyWarning: true, persistQuery: true },
+    );
   };
 
   return (
-    <div className="w-full max-w-2xl space-y-8">
+    <div
+      className="w-full max-w-2xl space-y-8"
+      aria-label="AI search"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={() => {
+        void handleTouchEnd();
+      }}
+      onTouchCancel={resetPullState}
+    >
+      <div
+        className={`overflow-hidden transition-[height,opacity] duration-200 ${
+          pullDistance > 0 || isRefreshing ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{ height: pullDistance > 0 || isRefreshing ? Math.max(40, pullDistance) : 0 }}
+        aria-live="polite"
+      >
+        <div
+          className={`flex h-full items-end justify-center pb-2 text-[10px] font-mono uppercase tracking-[0.18em] ${
+            pullDistance >= REFRESH_THRESHOLD_PX && !isRefreshing ? 'text-white' : 'text-ui-gray'
+          }`}
+        >
+          {pullRefreshLabel}
+        </div>
+      </div>
+
       <form onSubmit={handleSearch} className="space-y-6 utilitarian-border p-6 bg-dark-panel">
         <div className="grid grid-cols-1 md:grid-cols-[1.7fr_0.8fr] gap-4 items-end">
           <ProcessModeSwitch value={processMode} onChange={handleProcessModeChange} />
@@ -155,6 +342,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
                 className={`utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest ${
                   provider === option ? 'bg-white text-black border-white' : ''
                 }`}
+                aria-pressed={provider === option}
               >
                 {PROVIDER_LABELS[option]}
               </button>

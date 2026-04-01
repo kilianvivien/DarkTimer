@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Save, Eye, EyeOff, ExternalLink, Shield, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -82,12 +82,16 @@ interface CollapsibleSectionProps {
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, hint, defaultOpen = false, children }) => {
   const [open, setOpen] = useState(defaultOpen);
+  const contentId = useId();
+
   return (
     <div className="border-t border-dark-border">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between py-4 text-left group"
+        className="press-feedback w-full flex items-center justify-between py-4 text-left group"
+        aria-expanded={open}
+        aria-controls={contentId}
       >
         <div className="space-y-0.5">
           <span className="text-sm font-bold uppercase tracking-widest text-white group-hover:text-white transition-colors">
@@ -104,6 +108,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, hint, de
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
+            id={contentId}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -135,20 +140,23 @@ const PreferenceToggle: React.FC<PreferenceToggleProps> = ({
   description,
   onToggle,
 }) => {
+  const descriptionId = useId();
   return (
     <div className="flex items-start justify-between gap-4 border border-dark-border p-4">
       <div className="space-y-1 min-w-0">
         <p className="mono-label text-white">{label}</p>
-        <p className="text-xs text-ui-gray leading-relaxed">{description}</p>
+        <p id={descriptionId} className="text-xs text-ui-gray leading-relaxed">{description}</p>
       </div>
       <button
         type="button"
         onClick={onToggle}
         disabled={disabled}
-        className={`relative inline-flex h-6 w-11 items-center border transition-colors focus:outline-none ${
+        className={`press-feedback relative inline-flex h-6 w-11 items-center border transition-colors focus:outline-none ${
           checked ? 'bg-accent-red border-accent-red' : 'bg-transparent border-dark-border'
         } disabled:opacity-40`}
         aria-checked={checked}
+        aria-label={label}
+        aria-describedby={descriptionId}
         role="switch"
       >
         <span className={`inline-block h-4 w-4 transform bg-white transition-transform ${
@@ -402,13 +410,14 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 key={val}
                 type="button"
                 onClick={() => handleChange('phaseCountdown', val)}
-                className={`px-4 py-3 font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
+                className={`press-feedback px-4 py-3 font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
                   i < 2 ? 'border-r border-dark-border' : ''
                 } ${
                   settings.phaseCountdown === val
                     ? 'bg-white text-black'
                     : 'text-ui-gray hover:text-white hover:bg-[#0f0f0f]'
                 }`}
+                aria-pressed={settings.phaseCountdown === val}
               >
                 {val === 0 ? 'No delay' : `${val} sec`}
               </button>
@@ -437,6 +446,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 className={`utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest ${
                   settings.aiProvider === provider ? 'bg-white text-black border-white' : ''
                 }`}
+                aria-pressed={settings.aiProvider === provider}
               >
                 {provider === 'gemini' ? 'Gemini' : 'Mistral'}
               </button>
@@ -472,11 +482,12 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 key={option.value}
                 type="button"
                 onClick={() => handleChange('apiKeyPersistenceMode', option.value)}
-                className={`text-left border p-4 transition-colors ${
+                className={`press-feedback text-left border p-4 transition-colors ${
                   settings.apiKeyPersistenceMode === option.value
                     ? 'border-white bg-white text-black'
                     : 'border-dark-border text-white hover:border-white/40'
                 }`}
+                aria-pressed={settings.apiKeyPersistenceMode === option.value}
               >
                 <p className="text-xs font-mono uppercase tracking-[0.2em]">{option.title}</p>
                 <p className={`mt-2 text-xs leading-relaxed ${
@@ -700,12 +711,13 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 type="button"
                 onClick={() => handleChange('notificationsEnabled', !settings.notificationsEnabled)}
                 disabled={permissionStatus !== 'granted'}
-                className={`relative inline-flex h-6 w-11 items-center border transition-colors focus:outline-none ${
+                className={`press-feedback relative inline-flex h-6 w-11 items-center border transition-colors focus:outline-none ${
                   settings.notificationsEnabled && permissionStatus === 'granted'
                     ? 'bg-accent-red border-accent-red'
                     : 'bg-transparent border-dark-border'
                 } disabled:opacity-40`}
                 aria-checked={settings.notificationsEnabled}
+                aria-label="Enable notifications"
                 role="switch"
               >
                 <span className={`inline-block h-4 w-4 transform bg-white transition-transform ${

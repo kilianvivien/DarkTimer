@@ -29,7 +29,28 @@ describe('PresetLibrary', () => {
       />,
     );
 
-    await user.click(screen.getByText('HP5'));
+    await user.click(screen.getByRole('button', { name: /start preset hp5, id-11, iso 400/i }));
+    expect(onSelect).toHaveBeenCalledWith(preset);
+  });
+
+  it('supports keyboard activation for the preset card', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+
+    render(
+      <PresetLibrary
+        presets={[preset]}
+        onSelect={onSelect}
+        onDelete={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const cardButton = screen.getByRole('button', { name: /start preset hp5, id-11, iso 400/i });
+
+    await user.tab();
+    expect(cardButton).toHaveFocus();
+
+    await user.keyboard('{Enter}');
     expect(onSelect).toHaveBeenCalledWith(preset);
   });
 
@@ -38,9 +59,15 @@ describe('PresetLibrary', () => {
     const onSelect = vi.fn();
     const onDelete = vi.fn().mockResolvedValue(undefined);
 
-    render(<PresetLibrary presets={[preset]} onSelect={onSelect} onDelete={onDelete} />);
+    render(
+      <PresetLibrary
+        presets={[preset]}
+        onSelect={onSelect}
+        onDelete={onDelete}
+      />,
+    );
 
-    await user.click(screen.getByTitle('Delete Preset'));
+    await user.click(screen.getByRole('button', { name: /delete preset hp5/i }));
     expect(onDelete).toHaveBeenCalledWith('preset-1');
     expect(onSelect).not.toHaveBeenCalled();
   });

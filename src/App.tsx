@@ -227,10 +227,15 @@ export default function App() {
       {/* Header */}
       <header className="border-b border-dark-border bg-dark-bg sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={reset}>
+          <button
+            type="button"
+            className="press-feedback flex items-center space-x-2 cursor-pointer text-left"
+            onClick={reset}
+            aria-label="Return to manual timer"
+          >
             <Camera size={16} className="text-accent-red" />
             <span className="font-mono font-bold tracking-tighter text-sm uppercase">DARK<span className="text-accent-red">TIMER</span></span>
-          </div>
+          </button>
 
           <div className="flex items-center">
             {/* Desktop nav — hidden on mobile */}
@@ -241,7 +246,7 @@ export default function App() {
                   onClick={() => changeView(v)}
                   disabled={view === 'timer'}
                   className={cn(
-                    "px-4 h-14 font-mono text-xs uppercase tracking-widest transition-all border-b-2",
+                    "press-feedback px-4 h-14 font-mono text-xs uppercase tracking-widest transition-all border-b-2",
                     activeView === v ? "border-accent-red text-white" : "border-transparent text-ui-gray hover:text-white",
                     view === 'timer' && "opacity-30 cursor-not-allowed"
                   )}
@@ -263,7 +268,7 @@ export default function App() {
             {/* Info button — always visible */}
             <button
               onClick={() => setShowHelp(true)}
-              className="p-2 text-ui-gray hover:text-white transition-colors"
+              className="press-feedback p-2 text-ui-gray hover:text-white transition-colors"
               aria-label="How to use"
             >
               <Info size={16} />
@@ -414,7 +419,7 @@ export default function App() {
                 onClick={() => changeView(v)}
                 disabled={view === 'timer'}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1.5 flex-1 px-2 py-2.5 rounded-[1.2rem] transition-all duration-200",
+                  "press-feedback flex flex-col items-center justify-center gap-1.5 flex-1 px-2 py-2.5 rounded-[1.2rem] transition-all duration-200",
                   activeView === v
                     ? "bg-white text-black shadow-[0_2px_12px_rgba(0,0,0,0.3)]"
                     : "text-white/35 hover:text-white/60",
@@ -449,7 +454,14 @@ export default function App() {
             >
               <div className="flex justify-between items-start">
                 <h2 className="font-mono text-sm uppercase tracking-widest text-white">How to use DarkTimer</h2>
-                <button onClick={() => setShowHelp(false)} className="text-ui-gray hover:text-white transition-colors font-mono text-sm leading-none">✕</button>
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(false)}
+                  className="press-feedback text-ui-gray hover:text-white transition-colors font-mono text-sm leading-none"
+                  aria-label="Close help"
+                >
+                  ✕
+                </button>
               </div>
 
               <div className="space-y-5 text-sm font-mono text-ui-gray leading-relaxed">
