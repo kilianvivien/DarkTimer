@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, startTransition, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, lazy, startTransition, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { ManualTimerForm } from './components/ManualTimerForm';
 import { DevRecipe, type Session } from './services/recipe';
 import { deletePreset, savePreset, updatePreset } from './services/presets';
@@ -20,6 +20,12 @@ import {
 } from './services/secretStorage';
 import type { SettingsSaveRequest } from './components/SettingsMenu';
 import type { StoredChem } from './services/chemTypes';
+import {
+  applyPwaUpdate,
+  dismissPwaUpdatePrompt,
+  getPwaUpdateSnapshot,
+  subscribeToPwaUpdates,
+} from './services/pwa';
 
 type View = 'manual' | 'ai' | 'library' | 'chems' | 'settings' | 'timer';
 type ToastTone = 'success' | 'error';
@@ -87,6 +93,11 @@ export default function App() {
     isReady: apiKeysReady,
     migrationNotice,
   } = useApiKeySession();
+  const pwaUpdate = useSyncExternalStore(
+    subscribeToPwaUpdates,
+    getPwaUpdateSnapshot,
+    getPwaUpdateSnapshot,
+  );
   const appReady = storageReady && !settingsLoading && !presetsLoading && !sessionsLoading && apiKeysReady;
 
   const notify = useCallback((message: string, tone: ToastTone = 'success') => {
@@ -295,6 +306,15 @@ export default function App() {
 
   const handleIncrementChem = async (id: string) => {
     await incrementChemRollCount(id);
+  };
+
+  const handleApplyUpdate = async () => {
+    try {
+      await applyPwaUpdate();
+    } catch (error) {
+      console.error('Failed to apply DarkTimer update:', error);
+      notify('Update could not be applied. Close and reopen DarkTimer to try again.', 'error');
+    }
   };
 
   const activeView = view === 'timer' ? 'manual' : view;
@@ -611,6 +631,45 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {pwaUpdate.needRefresh && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-[60] md:inset-x-auto md:right-6 md:bottom-6 md:w-[26rem]"
+            aria-live="polite"
+          >
+            <div className="rounded-[1.75rem] border border-white/[0.08] bg-black/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_64px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+              <div className="space-y-2">
+                <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-accent-red">Update Ready</p>
+                <h2 className="text-base font-semibold tracking-tight text-white">A new DarkTimer version is available.</h2>
+                <p className="text-sm leading-relaxed text-white/72">
+                  Reload to install the latest features. Your recipes, history, chemistry, and settings stay on this device.
+                </p>
+              </div>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={dismissPwaUpdatePrompt}
+                  className="press-feedback rounded-full border border-white/[0.08] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-white/72 hover:text-white"
+                >
+                  Later
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleApplyUpdate()}
+                  disabled={pwaUpdate.isUpdating}
+                  className="press-feedback rounded-full bg-white px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-black disabled:cursor-progress disabled:opacity-70"
+                >
+                  {pwaUpdate.isUpdating ? 'Updating...' : 'Update App'}
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

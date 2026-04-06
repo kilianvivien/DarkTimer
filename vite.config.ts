@@ -46,7 +46,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         injectRegister: false,
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-512x512.png'],
         manifest: {
           name: 'DarkTimer',
