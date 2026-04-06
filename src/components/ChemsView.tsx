@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Check,
@@ -11,8 +11,10 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { EmptyState } from './EmptyState';
+import { SearchableField } from './SearchableField';
 import type { StoredChem, ChemType, ChemProcessMode } from '../services/chemTypes';
 import { DEVELOPER_OPTIONS, FIXER_OPTIONS } from '../services/searchCatalog';
+import type { SearchableOption } from '../services/searchCatalog';
 
 interface ChemsViewProps {
   chems: StoredChem[];
@@ -88,6 +90,34 @@ const EMPTY_FORM: AddChemFormData = {
   notes: '',
 };
 
+const SLIDE_PROCESS_KEYWORDS = ['e6', 'slide', 'reversal'];
+
+function isSlideChemOption(option: SearchableOption): boolean {
+  return option.keywords?.some((keyword) => SLIDE_PROCESS_KEYWORDS.includes(keyword.toLowerCase())) ?? false;
+}
+
+function getChemNameOptions(type: ChemType, processMode: ChemProcessMode): SearchableOption[] {
+  const options = type === 'developer' ? DEVELOPER_OPTIONS : FIXER_OPTIONS;
+
+  return options.filter((option) => {
+    if (!option.processModes) {
+      return true;
+    }
+
+    const isSlideOption = isSlideChemOption(option);
+
+    if (processMode === 'bw') {
+      return option.processModes.includes('bw');
+    }
+
+    if (processMode === 'neutral') {
+      return isSlideOption;
+    }
+
+    return option.processModes.includes('color') && !isSlideOption;
+  });
+}
+
 interface ChemCardProps {
   chem: StoredChem;
   warning: ChemWarning;
@@ -123,6 +153,10 @@ const ChemCard: React.FC<ChemCardProps> = ({
     notes: chem.notes,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const editNameOptions = useMemo(
+    () => getChemNameOptions(editForm.type, editForm.processMode),
+    [editForm.processMode, editForm.type],
+  );
 
   const setEditField = <K extends keyof AddChemFormData>(key: K, value: AddChemFormData[K]) => {
     setEditForm((prev) => ({ ...prev, [key]: value }));
@@ -184,29 +218,13 @@ const ChemCard: React.FC<ChemCardProps> = ({
 
             {/* Name */}
             <div className="space-y-1">
-              <label className="mono-label">Name *</label>
-              <input
-                type="text"
-                list="chem-edit-suggestions"
+              <SearchableField
+                label="Name *"
+                options={editNameOptions}
+                placeholder={editForm.type === 'developer' ? 'e.g. HC-110, Rodinal' : 'e.g. Ilford Rapid Fixer'}
                 value={editForm.name}
-                onChange={(e) => setEditField('name', e.target.value)}
-                className="utilitarian-input mobile-form-control-inline w-full"
-                required
+                onChange={(value) => setEditField('name', value)}
               />
-              <datalist id="chem-edit-suggestions">
-                {(editForm.type === 'developer' ? DEVELOPER_OPTIONS : FIXER_OPTIONS)
-                  .filter((opt) => {
-                    if (!opt.processModes) return true;
-                    const isE6 = opt.keywords?.some((k) => ['e6', 'slide', 'reversal'].includes(k)) ?? false;
-                    if (editForm.processMode === 'bw') return opt.processModes.includes('bw');
-                    if (editForm.processMode === 'neutral') return isE6;
-                    if (editForm.processMode === 'color') return opt.processModes.includes('color') && !isE6;
-                    return true;
-                  })
-                  .map((opt) => (
-                    <option key={opt.value} value={opt.value} />
-                  ))}
-              </datalist>
             </div>
 
             {/* Type + Process */}
@@ -459,6 +477,10 @@ export const ChemsView: React.FC<ChemsViewProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const nameOptions = useMemo(
+    () => getChemNameOptions(form.type, form.processMode),
+    [form.processMode, form.type],
+  );
 
   const setField = <K extends keyof AddChemFormData>(key: K, value: AddChemFormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -539,30 +561,13 @@ export const ChemsView: React.FC<ChemsViewProps> = ({
 
               {/* Name */}
               <div className="space-y-1">
-                <label className="mono-label">Name *</label>
-                <input
-                  type="text"
-                  list="chem-name-suggestions"
-                  value={form.name}
-                  onChange={(e) => setField('name', e.target.value)}
-                  className="utilitarian-input mobile-form-control-inline w-full"
+                <SearchableField
+                  label="Name *"
+                  options={nameOptions}
                   placeholder={form.type === 'developer' ? 'e.g. HC-110, Rodinal' : 'e.g. Ilford Rapid Fixer'}
-                  required
+                  value={form.name}
+                  onChange={(value) => setField('name', value)}
                 />
-                <datalist id="chem-name-suggestions">
-                  {(form.type === 'developer' ? DEVELOPER_OPTIONS : FIXER_OPTIONS)
-                    .filter((opt) => {
-                      if (!opt.processModes) return true;
-                      const isE6 = opt.keywords?.some((k) => ['e6', 'slide', 'reversal'].includes(k)) ?? false;
-                      if (form.processMode === 'bw') return opt.processModes.includes('bw');
-                      if (form.processMode === 'neutral') return isE6;
-                      if (form.processMode === 'color') return opt.processModes.includes('color') && !isE6;
-                      return true;
-                    })
-                    .map((opt) => (
-                      <option key={opt.value} value={opt.value} />
-                    ))}
-                </datalist>
               </div>
 
               {/* Type + Process */}
