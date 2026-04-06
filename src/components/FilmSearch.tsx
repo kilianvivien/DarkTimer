@@ -517,7 +517,13 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
               options={filmOptions}
               placeholder={processMode === 'bw' ? 'e.g. Tri-X 400' : 'e.g. Portra 400'}
               value={film}
-              onChange={setFilm}
+              onChange={(value) => {
+                setFilm(value);
+                const match = FILM_STOCK_OPTIONS.find((o) => o.value === value);
+                if (match?.iso != null && ISO_OPTIONS.includes(match.iso)) {
+                  setIso(match.iso);
+                }
+              }}
             />
           </div>
           <div className="col-span-2 md:col-span-1 min-w-0">

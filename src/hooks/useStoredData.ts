@@ -7,8 +7,10 @@ import {
   getStoredPresets,
   getStoredSessions,
   getStoredSettings,
+  getStoredChems,
   saveStoredSettings,
 } from '../services/storage';
+import type { StoredChem } from '../services/chemTypes';
 import type { UserSettings } from '../services/userSettings';
 
 interface AsyncState<T> {
@@ -106,6 +108,14 @@ export function useStoredSessions(): AsyncState<Session[]> {
   return useStoredResource(
     useCallback(() => getStoredSessions(), []),
     useCallback((listener: () => void) => subscribeToStorage('sessions', listener), []),
+    [],
+  );
+}
+
+export function useStoredChems(): AsyncState<StoredChem[]> {
+  return useStoredResource(
+    useCallback(() => getStoredChems(), []),
+    useCallback((listener: () => void) => subscribeToStorage('chems', listener), []),
     [],
   );
 }

@@ -12,6 +12,7 @@ function renderSettingsMenu(overrides: Partial<ComponentProps<typeof SettingsMen
       hasEncryptedApiKeys={false}
       isVaultLocked={false}
       onClearHistory={vi.fn().mockResolvedValue(undefined)}
+      onClearAllData={vi.fn().mockResolvedValue(undefined)}
       onForgetSavedKeys={vi.fn().mockResolvedValue(undefined)}
       onSettingsChange={vi.fn().mockResolvedValue(undefined)}
       onSave={vi.fn().mockResolvedValue(undefined)}

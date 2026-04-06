@@ -7,9 +7,10 @@ import {
   type AIProvider,
   type UserSettings,
 } from './userSettings';
+import type { StoredChem, ChemType, ChemProcessMode } from './chemTypes';
 
 const DB_NAME = 'darktimer-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const SETTINGS_KEY = 'user';
 const ENCRYPTED_API_VAULT_KEY = 'apiKeys';
 
@@ -18,7 +19,7 @@ const LEGACY_PRESETS_KEY = 'darktimer_presets';
 const LEGACY_GEMINI_KEY = 'darktimer_gemini_key';
 const LEGACY_MISTRAL_KEY = 'darktimer_mistral_key';
 
-type StorageTopic = 'settings' | 'presets' | 'sessions';
+type StorageTopic = 'settings' | 'presets' | 'sessions' | 'chems';
 
 interface SettingsRecord {
   key: typeof SETTINGS_KEY;
@@ -69,12 +70,22 @@ interface DarkTimerDB extends DBSchema {
     key: string;
     value: EncryptedApiKeyVaultRecord;
   };
+  chems: {
+    key: string;
+    value: StoredChem;
+    indexes: {
+      type: ChemType;
+      processMode: ChemProcessMode;
+      createdAt: number;
+    };
+  };
 }
 
 const listeners: Record<StorageTopic, Set<() => void>> = {
   settings: new Set(),
   presets: new Set(),
   sessions: new Set(),
+  chems: new Set(),
 };
 
 let dbPromise: Promise<IDBPDatabase<DarkTimerDB>> | null = null;
@@ -113,6 +124,13 @@ function getDb(): Promise<IDBPDatabase<DarkTimerDB>> {
 
         if (!db.objectStoreNames.contains('secureVault')) {
           db.createObjectStore('secureVault');
+        }
+
+        if (!db.objectStoreNames.contains('chems')) {
+          const chems = db.createObjectStore('chems', { keyPath: 'id' });
+          chems.createIndex('type', 'type');
+          chems.createIndex('processMode', 'processMode');
+          chems.createIndex('createdAt', 'createdAt');
         }
       },
     });
@@ -395,10 +413,124 @@ export async function clearStoredSessions(): Promise<void> {
   emit('sessions');
 }
 
+function normalizeChemType(value: unknown): ChemType {
+  return value === 'fixer' ? 'fixer' : 'developer';
+}
+
+function normalizeChemProcessMode(value: unknown): ChemProcessMode {
+  if (value === 'color' || value === 'neutral') return value;
+  return 'bw';
+}
+
+function normalizeChem(raw: unknown): StoredChem {
+  const r = typeof raw === 'object' && raw !== null ? raw : {};
+  const getField = <T>(key: string, fallback: T): T =>
+    (key in (r as Record<string, unknown>) ? (r as Record<string, unknown>)[key] : fallback) as T;
+
+  const createdAt = getField<unknown>('createdAt', undefined);
+  const mixDate = getField<unknown>('mixDate', undefined);
+  const expirationDate = getField<unknown>('expirationDate', null);
+  const rollCount = getField<unknown>('rollCount', 0);
+  const maxRolls = getField<unknown>('maxRolls', null);
+
+  return {
+    id: typeof getField('id', '') === 'string' && (getField('id', '') as string).trim()
+      ? (getField('id', '') as string)
+      : crypto.randomUUID(),
+    name: typeof getField('name', '') === 'string' ? (getField('name', '') as string) : '',
+    type: normalizeChemType(getField('type', 'developer')),
+    processMode: normalizeChemProcessMode(getField('processMode', 'bw')),
+    mixDate: typeof mixDate === 'number' && Number.isFinite(mixDate) ? mixDate : Date.now(),
+    expirationDate:
+      typeof expirationDate === 'number' && Number.isFinite(expirationDate) ? expirationDate : null,
+    rollCount: typeof rollCount === 'number' && Number.isFinite(rollCount) ? Math.max(0, Math.round(rollCount)) : 0,
+    maxRolls: typeof maxRolls === 'number' && Number.isFinite(maxRolls) ? Math.max(1, Math.round(maxRolls)) : null,
+    notes: typeof getField('notes', '') === 'string' ? (getField('notes', '') as string) : '',
+    createdAt:
+      typeof createdAt === 'number' && Number.isFinite(createdAt) ? createdAt : Date.now(),
+  };
+}
+
+export async function getStoredChems(): Promise<StoredChem[]> {
+  await initStorage();
+  const db = await getDb();
+  const chems = await db.getAll('chems');
+  return chems
+    .map((c) => normalizeChem(c))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function saveStoredChem(
+  data: Omit<StoredChem, 'id' | 'createdAt'>,
+): Promise<StoredChem> {
+  const chem: StoredChem = normalizeChem({ ...data, id: crypto.randomUUID(), createdAt: Date.now() });
+  await initStorage();
+  const db = await getDb();
+  await db.put('chems', chem);
+  emit('chems');
+  return chem;
+}
+
+export async function updateStoredChem(
+  id: string,
+  patch: Partial<Omit<StoredChem, 'id' | 'createdAt'>>,
+): Promise<StoredChem> {
+  await initStorage();
+  const db = await getDb();
+  const existing = await db.get('chems', id);
+  const updated = normalizeChem({ ...existing, ...patch, id, createdAt: existing?.createdAt ?? Date.now() });
+  await db.put('chems', updated);
+  emit('chems');
+  return updated;
+}
+
+export async function deleteStoredChem(id: string): Promise<void> {
+  await initStorage();
+  const db = await getDb();
+  await db.delete('chems', id);
+  emit('chems');
+}
+
+export async function incrementChemRollCount(id: string): Promise<StoredChem> {
+  await initStorage();
+  const db = await getDb();
+  const existing = await db.get('chems', id);
+  const updated = normalizeChem({
+    ...existing,
+    id,
+    createdAt: existing?.createdAt ?? Date.now(),
+    rollCount: ((existing?.rollCount ?? 0) as number) + 1,
+  });
+  await db.put('chems', updated);
+  emit('chems');
+  return updated;
+}
+
+export async function clearAllData(): Promise<void> {
+  await initStorage();
+  const db = await getDb();
+  await Promise.all([
+    db.clear('presets'),
+    db.clear('sessions'),
+    db.clear('chems'),
+    db.clear('settings'),
+    db.clear('secureVault'),
+    db.clear('apiKeys'),
+  ]);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.clear();
+  }
+  emit('presets');
+  emit('sessions');
+  emit('chems');
+  emit('settings');
+}
+
 export async function __resetStorageForTests(): Promise<void> {
   listeners.settings.clear();
   listeners.presets.clear();
   listeners.sessions.clear();
+  listeners.chems.clear();
 
   if (dbPromise) {
     const db = await dbPromise.catch(() => null);

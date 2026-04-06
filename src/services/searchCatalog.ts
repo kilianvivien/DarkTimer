@@ -5,75 +5,76 @@ export interface SearchableOption {
   label: string;
   keywords?: string[];
   processModes?: ProcessMode[];
+  iso?: number;
 }
 
 export const ISO_OPTIONS = [1, 2, 3, 6, 12, 25, 50, 64, 100, 125, 200, 250, 320, 400, 800, 1600, 3200];
 
 export const FILM_STOCK_OPTIONS: SearchableOption[] = [
   // Black & White — Ilford
-  { value: 'HP5 Plus', label: 'HP5 Plus', keywords: ['hp5', 'ilford'], processModes: ['bw'] },
-  { value: 'FP4 Plus', label: 'FP4 Plus', keywords: ['fp4', 'ilford'], processModes: ['bw'] },
-  { value: 'Delta 100', label: 'Delta 100', keywords: ['ilford'], processModes: ['bw'] },
-  { value: 'Delta 400', label: 'Delta 400', keywords: ['ilford'], processModes: ['bw'] },
-  { value: 'Delta 3200', label: 'Delta 3200', keywords: ['ilford'], processModes: ['bw'] },
-  { value: 'Kentmere 100', label: 'Kentmere 100', keywords: ['kentmere', 'ilford'], processModes: ['bw'] },
-  { value: 'Kentmere 400', label: 'Kentmere 400', keywords: ['kentmere', 'ilford'], processModes: ['bw'] },
-  { value: 'SFX 200', label: 'SFX 200', keywords: ['sfx', 'infrared', 'ilford'], processModes: ['bw'] },
+  { value: 'HP5 Plus', label: 'HP5 Plus', keywords: ['hp5', 'ilford'], processModes: ['bw'], iso: 400 },
+  { value: 'FP4 Plus', label: 'FP4 Plus', keywords: ['fp4', 'ilford'], processModes: ['bw'], iso: 125 },
+  { value: 'Delta 100', label: 'Delta 100', keywords: ['ilford'], processModes: ['bw'], iso: 100 },
+  { value: 'Delta 400', label: 'Delta 400', keywords: ['ilford'], processModes: ['bw'], iso: 400 },
+  { value: 'Delta 3200', label: 'Delta 3200', keywords: ['ilford'], processModes: ['bw'], iso: 3200 },
+  { value: 'Kentmere 100', label: 'Kentmere 100', keywords: ['kentmere', 'ilford'], processModes: ['bw'], iso: 100 },
+  { value: 'Kentmere 400', label: 'Kentmere 400', keywords: ['kentmere', 'ilford'], processModes: ['bw'], iso: 400 },
+  { value: 'SFX 200', label: 'SFX 200', keywords: ['sfx', 'infrared', 'ilford'], processModes: ['bw'], iso: 200 },
   { value: 'Ortho Plus', label: 'Ortho Plus', keywords: ['ortho', 'ilford'], processModes: ['bw'] },
   // Black & White — Kodak
-  { value: 'Tri-X 400', label: 'Tri-X 400', keywords: ['trix', 'kodak'], processModes: ['bw'] },
-  { value: 'T-Max 100', label: 'T-Max 100', keywords: ['tmax', 'kodak'], processModes: ['bw'] },
-  { value: 'T-Max 400', label: 'T-Max 400', keywords: ['tmax', 'kodak', 'tmy2'], processModes: ['bw'] },
-  { value: 'T-Max P3200', label: 'T-Max P3200', keywords: ['p3200', 'tmz', 'kodak', 'tmax'], processModes: ['bw'] },
-  { value: 'Double-X', label: 'Double-X', keywords: ['xx', 'kodak', 'cinestill', 'bwxx'], processModes: ['bw'] },
+  { value: 'Tri-X 400', label: 'Tri-X 400', keywords: ['trix', 'kodak'], processModes: ['bw'], iso: 400 },
+  { value: 'T-Max 100', label: 'T-Max 100', keywords: ['tmax', 'kodak'], processModes: ['bw'], iso: 100 },
+  { value: 'T-Max 400', label: 'T-Max 400', keywords: ['tmax', 'kodak', 'tmy2'], processModes: ['bw'], iso: 400 },
+  { value: 'T-Max P3200', label: 'T-Max P3200', keywords: ['p3200', 'tmz', 'kodak', 'tmax'], processModes: ['bw'], iso: 3200 },
+  { value: 'Double-X', label: 'Double-X', keywords: ['xx', 'kodak', 'cinestill', 'bwxx'], processModes: ['bw'], iso: 250 },
   // Black & White — Fujifilm
-  { value: 'Acros II', label: 'Acros II', keywords: ['acros', 'fujifilm', 'fuji'], processModes: ['bw'] },
+  { value: 'Acros II', label: 'Acros II', keywords: ['acros', 'fujifilm', 'fuji'], processModes: ['bw'], iso: 100 },
   // Black & White — Foma
-  { value: 'Fomapan 100', label: 'Fomapan 100', keywords: ['foma'], processModes: ['bw'] },
-  { value: 'Fomapan 200', label: 'Fomapan 200', keywords: ['foma'], processModes: ['bw'] },
-  { value: 'Fomapan 400', label: 'Fomapan 400', keywords: ['foma'], processModes: ['bw'] },
+  { value: 'Fomapan 100', label: 'Fomapan 100', keywords: ['foma'], processModes: ['bw'], iso: 100 },
+  { value: 'Fomapan 200', label: 'Fomapan 200', keywords: ['foma'], processModes: ['bw'], iso: 200 },
+  { value: 'Fomapan 400', label: 'Fomapan 400', keywords: ['foma'], processModes: ['bw'], iso: 400 },
   // Black & White — Rollei / Agfa / Adox
-  { value: 'Rollei RPX 100', label: 'Rollei RPX 100', keywords: ['rollei', 'rpx'], processModes: ['bw'] },
-  { value: 'Rollei RPX 400', label: 'Rollei RPX 400', keywords: ['rollei', 'rpx'], processModes: ['bw'] },
-  { value: 'Rollei Retro 400S', label: 'Rollei Retro 400S', keywords: ['rollei', 'retro'], processModes: ['bw'] },
-  { value: 'Adox HR-50', label: 'Adox HR-50', keywords: ['adox', 'hr50'], processModes: ['bw'] },
-  { value: 'Adox CMS 20 II', label: 'Adox CMS 20 II', keywords: ['adox', 'cms20'], processModes: ['bw'] },
+  { value: 'Rollei RPX 100', label: 'Rollei RPX 100', keywords: ['rollei', 'rpx'], processModes: ['bw'], iso: 100 },
+  { value: 'Rollei RPX 400', label: 'Rollei RPX 400', keywords: ['rollei', 'rpx'], processModes: ['bw'], iso: 400 },
+  { value: 'Rollei Retro 400S', label: 'Rollei Retro 400S', keywords: ['rollei', 'retro'], processModes: ['bw'], iso: 400 },
+  { value: 'Adox HR-50', label: 'Adox HR-50', keywords: ['adox', 'hr50'], processModes: ['bw'], iso: 50 },
+  { value: 'Adox CMS 20 II', label: 'Adox CMS 20 II', keywords: ['adox', 'cms20'], processModes: ['bw'], iso: 25 },
   // Black & White — Bergger / JCH / Kosmo / Lomography
-  { value: 'Bergger Pancro 400', label: 'Bergger Pancro 400', keywords: ['bergger', 'pancro'], processModes: ['bw'] },
-  { value: 'JCH StreetPan 400', label: 'JCH StreetPan 400', keywords: ['jch', 'streetpan', 'japan camera hunter'], processModes: ['bw'] },
-  { value: 'Kosmo Foto Mono 100', label: 'Kosmo Foto Mono 100', keywords: ['kosmo'], processModes: ['bw'] },
-  { value: 'Lomography Lady Grey 400', label: 'Lomography Lady Grey 400', keywords: ['lomo', 'lomography', 'ladygrey'], processModes: ['bw'] },
+  { value: 'Bergger Pancro 400', label: 'Bergger Pancro 400', keywords: ['bergger', 'pancro'], processModes: ['bw'], iso: 400 },
+  { value: 'JCH StreetPan 400', label: 'JCH StreetPan 400', keywords: ['jch', 'streetpan', 'japan camera hunter'], processModes: ['bw'], iso: 400 },
+  { value: 'Kosmo Foto Mono 100', label: 'Kosmo Foto Mono 100', keywords: ['kosmo'], processModes: ['bw'], iso: 100 },
+  { value: 'Lomography Lady Grey 400', label: 'Lomography Lady Grey 400', keywords: ['lomo', 'lomography', 'ladygrey'], processModes: ['bw'], iso: 400 },
   // Color Negative — Kodak
   { value: 'Portra 160', label: 'Portra 160', keywords: ['kodak'], processModes: ['color'] },
-  { value: 'Portra 400', label: 'Portra 400', keywords: ['kodak'], processModes: ['color'] },
-  { value: 'Portra 800', label: 'Portra 800', keywords: ['kodak'], processModes: ['color'] },
-  { value: 'Ektar 100', label: 'Ektar 100', keywords: ['kodak'], processModes: ['color'] },
-  { value: 'Gold 200', label: 'Gold 200', keywords: ['kodak'], processModes: ['color'] },
-  { value: 'Gold 400', label: 'Gold 400', keywords: ['kodak'], processModes: ['color'] },
-  { value: 'UltraMax 400', label: 'UltraMax 400', keywords: ['kodak', 'ultramax'], processModes: ['color'] },
-  { value: 'ColorPlus 200', label: 'ColorPlus 200', keywords: ['kodak', 'colorplus'], processModes: ['color'] },
-  { value: 'Pro Image 100', label: 'Pro Image 100', keywords: ['kodak', 'proimage'], processModes: ['color'] },
-  { value: 'Vision3 250D', label: 'Vision3 250D', keywords: ['kodak', 'vision3', 'motion picture', 'ecn2'], processModes: ['color'] },
+  { value: 'Portra 400', label: 'Portra 400', keywords: ['kodak'], processModes: ['color'], iso: 400 },
+  { value: 'Portra 800', label: 'Portra 800', keywords: ['kodak'], processModes: ['color'], iso: 800 },
+  { value: 'Ektar 100', label: 'Ektar 100', keywords: ['kodak'], processModes: ['color'], iso: 100 },
+  { value: 'Gold 200', label: 'Gold 200', keywords: ['kodak'], processModes: ['color'], iso: 200 },
+  { value: 'Gold 400', label: 'Gold 400', keywords: ['kodak'], processModes: ['color'], iso: 400 },
+  { value: 'UltraMax 400', label: 'UltraMax 400', keywords: ['kodak', 'ultramax'], processModes: ['color'], iso: 400 },
+  { value: 'ColorPlus 200', label: 'ColorPlus 200', keywords: ['kodak', 'colorplus'], processModes: ['color'], iso: 200 },
+  { value: 'Pro Image 100', label: 'Pro Image 100', keywords: ['kodak', 'proimage'], processModes: ['color'], iso: 100 },
+  { value: 'Vision3 250D', label: 'Vision3 250D', keywords: ['kodak', 'vision3', 'motion picture', 'ecn2'], processModes: ['color'], iso: 250 },
   { value: 'Vision3 500T', label: 'Vision3 500T', keywords: ['kodak', 'vision3', 'motion picture', 'ecn2'], processModes: ['color'] },
   // Color Negative — Fujifilm
-  { value: 'Fujifilm 400', label: 'Fujifilm 400', keywords: ['fuji', 'fujifilm'], processModes: ['color'] },
-  { value: 'Fujicolor 200', label: 'Fujicolor 200', keywords: ['fuji', 'fujifilm'], processModes: ['color'] },
-  { value: 'Superia X-TRA 400', label: 'Superia X-TRA 400', keywords: ['fuji', 'fujifilm', 'superia'], processModes: ['color'] },
+  { value: 'Fujifilm 400', label: 'Fujifilm 400', keywords: ['fuji', 'fujifilm'], processModes: ['color'], iso: 400 },
+  { value: 'Fujicolor 200', label: 'Fujicolor 200', keywords: ['fuji', 'fujifilm'], processModes: ['color'], iso: 200 },
+  { value: 'Superia X-TRA 400', label: 'Superia X-TRA 400', keywords: ['fuji', 'fujifilm', 'superia'], processModes: ['color'], iso: 400 },
   // Color Negative — CineStill
-  { value: 'CineStill 50D', label: 'CineStill 50D', keywords: ['cinestill'], processModes: ['color'] },
-  { value: 'CineStill 400D', label: 'CineStill 400D', keywords: ['cinestill'], processModes: ['color'] },
-  { value: 'CineStill 800T', label: 'CineStill 800T', keywords: ['cinestill'], processModes: ['color'] },
+  { value: 'CineStill 50D', label: 'CineStill 50D', keywords: ['cinestill'], processModes: ['color'], iso: 50 },
+  { value: 'CineStill 400D', label: 'CineStill 400D', keywords: ['cinestill'], processModes: ['color'], iso: 400 },
+  { value: 'CineStill 800T', label: 'CineStill 800T', keywords: ['cinestill'], processModes: ['color'], iso: 800 },
   // Color Negative — Harman / Lomography
-  { value: 'Harman Phoenix 200', label: 'Harman Phoenix 200', keywords: ['harman', 'phoenix', 'ilford'], processModes: ['color'] },
-  { value: 'Lomography Color Negative 100', label: 'Lomography Color Negative 100', keywords: ['lomo', 'lomography'], processModes: ['color'] },
-  { value: 'Lomography Color Negative 400', label: 'Lomography Color Negative 400', keywords: ['lomo', 'lomography'], processModes: ['color'] },
-  { value: 'Lomography Color Negative 800', label: 'Lomography Color Negative 800', keywords: ['lomo', 'lomography'], processModes: ['color'] },
+  { value: 'Harman Phoenix 200', label: 'Harman Phoenix 200', keywords: ['harman', 'phoenix', 'ilford'], processModes: ['color'], iso: 200 },
+  { value: 'Lomography Color Negative 100', label: 'Lomography Color Negative 100', keywords: ['lomo', 'lomography'], processModes: ['color'], iso: 100 },
+  { value: 'Lomography Color Negative 400', label: 'Lomography Color Negative 400', keywords: ['lomo', 'lomography'], processModes: ['color'], iso: 400 },
+  { value: 'Lomography Color Negative 800', label: 'Lomography Color Negative 800', keywords: ['lomo', 'lomography'], processModes: ['color'], iso: 800 },
   // Slide / Reversal (E-6)
-  { value: 'Provia 100F', label: 'Provia 100F', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'] },
-  { value: 'Velvia 50', label: 'Velvia 50', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'] },
-  { value: 'Velvia 100', label: 'Velvia 100', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'] },
-  { value: 'Velvia 100F', label: 'Velvia 100F', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'] },
-  { value: 'Ektachrome E100', label: 'Ektachrome E100', keywords: ['kodak', 'slide', 'e6', 'reversal'], processModes: ['color'] },
+  { value: 'Provia 100F', label: 'Provia 100F', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'], iso: 100 },
+  { value: 'Velvia 50', label: 'Velvia 50', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'], iso: 50 },
+  { value: 'Velvia 100', label: 'Velvia 100', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'], iso: 100 },
+  { value: 'Velvia 100F', label: 'Velvia 100F', keywords: ['fujifilm', 'slide', 'e6', 'reversal'], processModes: ['color'], iso: 100 },
+  { value: 'Ektachrome E100', label: 'Ektachrome E100', keywords: ['kodak', 'slide', 'e6', 'reversal'], processModes: ['color'], iso: 100 },
 ];
 
 export const DEVELOPER_OPTIONS: SearchableOption[] = [
@@ -122,6 +123,40 @@ export const DEVELOPER_OPTIONS: SearchableOption[] = [
   { value: 'E-6', label: 'E-6', keywords: ['slide', 'reversal', 'e6'], processModes: ['color'] },
   { value: 'Rollei Digibase E-6', label: 'Rollei Digibase E-6', keywords: ['rollei', 'digibase', 'slide', 'e6'], processModes: ['color'] },
   { value: 'Tetenal E-6', label: 'Tetenal E-6', keywords: ['tetenal', 'slide', 'e6'], processModes: ['color'] },
+];
+
+export const FIXER_OPTIONS: SearchableOption[] = [
+  // B&W — Ilford
+  { value: 'Ilford Rapid Fixer', label: 'Ilford Rapid Fixer', keywords: ['ilford', 'rapid'], processModes: ['bw'] },
+  { value: 'Hypam', label: 'Hypam', keywords: ['ilford', 'hypam'], processModes: ['bw'] },
+  { value: 'Ilford Fixer', label: 'Ilford Fixer', keywords: ['ilford'], processModes: ['bw'] },
+  // B&W — Kodak
+  { value: 'Kodak Rapid Fixer', label: 'Kodak Rapid Fixer', keywords: ['kodak', 'rapid'], processModes: ['bw'] },
+  { value: 'Kodak Fixer', label: 'Kodak Fixer', keywords: ['kodak'], processModes: ['bw'] },
+  { value: 'Kodak Unifix', label: 'Kodak Unifix', keywords: ['kodak', 'unifix', 'powder'], processModes: ['bw'] },
+  // B&W — Adox / Adofix
+  { value: 'Adofix Plus', label: 'Adofix Plus', keywords: ['adox', 'adofix'], processModes: ['bw'] },
+  { value: 'Adofix', label: 'Adofix', keywords: ['adox', 'adofix'], processModes: ['bw'] },
+  // B&W — Tetenal / Agfa / Rollei
+  { value: 'Tetenal Superfix Plus', label: 'Tetenal Superfix Plus', keywords: ['tetenal', 'superfix'], processModes: ['bw'] },
+  { value: 'Agfa Agefix', label: 'Agfa Agefix', keywords: ['agfa', 'agefix'], processModes: ['bw'] },
+  { value: 'Rollei RFX Plus', label: 'Rollei RFX Plus', keywords: ['rollei', 'rfx'], processModes: ['bw'] },
+  // B&W — Paterson / Sprint / Formulary
+  { value: 'Paterson Acufix', label: 'Paterson Acufix', keywords: ['paterson', 'acufix'], processModes: ['bw'] },
+  { value: 'Sprint Record Fixer', label: 'Sprint Record Fixer', keywords: ['sprint', 'record'], processModes: ['bw'] },
+  { value: 'TF-4 Alkaline Fixer', label: 'TF-4 Alkaline Fixer', keywords: ['formulary', 'tf4', 'alkaline'], processModes: ['bw'] },
+  { value: 'TF-5', label: 'TF-5', keywords: ['formulary', 'tf5', 'alkaline'], processModes: ['bw'] },
+  // B&W — Foma / Others
+  { value: 'Fomafix', label: 'Fomafix', keywords: ['foma', 'fomafix'], processModes: ['bw'] },
+  { value: 'Cinestill Df96 Monobath', label: 'Cinestill Df96 Monobath', keywords: ['cinestill', 'df96', 'monobath'], processModes: ['bw'] },
+  // Color — C-41 Blix / Fixer (for kits that have separate fixer step)
+  { value: 'Cinestill Cs41 Blix', label: 'Cinestill Cs41 Blix', keywords: ['cinestill', 'cs41', 'blix', 'color'], processModes: ['color'] },
+  { value: 'Tetenal C-41 Blix', label: 'Tetenal C-41 Blix', keywords: ['tetenal', 'blix', 'color'], processModes: ['color'] },
+  { value: 'Unicolor C-41 Blix', label: 'Unicolor C-41 Blix', keywords: ['unicolor', 'blix', 'color'], processModes: ['color'] },
+  { value: 'Rollei Digibase C-41 Blix', label: 'Rollei Digibase C-41 Blix', keywords: ['rollei', 'digibase', 'blix', 'color'], processModes: ['color'] },
+  // Color — E-6 Fixer
+  { value: 'Tetenal E-6 Fixer', label: 'Tetenal E-6 Fixer', keywords: ['tetenal', 'e6', 'slide', 'fixer'], processModes: ['color'] },
+  { value: 'Rollei Digibase E-6 Fixer', label: 'Rollei Digibase E-6 Fixer', keywords: ['rollei', 'digibase', 'e6', 'slide', 'fixer'], processModes: ['color'] },
 ];
 
 export const DILUTION_OPTIONS: SearchableOption[] = [

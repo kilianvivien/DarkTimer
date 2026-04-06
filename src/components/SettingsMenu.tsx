@@ -22,6 +22,7 @@ interface SettingsMenuProps {
   hasEncryptedApiKeys: boolean;
   isVaultLocked: boolean;
   onClearHistory: () => Promise<void>;
+  onClearAllData: () => Promise<void>;
   onForgetSavedKeys: (settings: UserSettings) => Promise<void>;
   onSettingsChange: (settings: UserSettings) => Promise<void>;
   onSave: (request: SettingsSaveRequest) => Promise<void>;
@@ -179,6 +180,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   hasEncryptedApiKeys,
   isVaultLocked,
   onClearHistory,
+  onClearAllData,
   onForgetSavedKeys,
   onSettingsChange,
   onSave,
@@ -201,6 +203,9 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   const [isForgettingKeys, setIsForgettingKeys] = useState(false);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
   const [confirmClearHistory, setConfirmClearHistory] = useState(false);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
+  const [clearAllError, setClearAllError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [settingsError, setSettingsError] = useState('');
   const [unlockError, setUnlockError] = useState('');
@@ -360,6 +365,19 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     }
   };
 
+  const handleClearAllData = async () => {
+    setIsClearingAll(true);
+    setClearAllError('');
+
+    try {
+      await onClearAllData();
+      window.location.reload();
+    } catch (error) {
+      setClearAllError(error instanceof Error ? error.message : 'App data could not be cleared.');
+      setIsClearingAll(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-xl space-y-8">
 
@@ -444,6 +462,15 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             />
           </div>
         </CollapsibleSection>
+
+        <div className="border-t border-dark-border pt-6">
+          <PreferenceToggle
+            checked={settings.autoTrackChemRolls}
+            label="Auto-track rolls"
+            description="Automatically increment the roll count of a matching developer batch in Chems when a session completes. The developer name must exactly match the chemistry name."
+            onToggle={() => handleChange('autoTrackChemRolls', !settings.autoTrackChemRolls)}
+          />
+        </div>
 
         <div className="space-y-4 border-t border-dark-border pt-6">
           <div className="space-y-1">
@@ -894,6 +921,53 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
           )}
 
           {historyError ? <p className="text-xs font-mono text-accent-red">{historyError}</p> : null}
+        </div>
+
+        <div className="border border-dark-border p-4 space-y-4">
+          <div className="space-y-1">
+            <p className="mono-label text-white">Reset app data</p>
+            <p className="text-xs text-ui-gray leading-relaxed">
+              Permanently delete all data stored on this device — presets, session history, chemistry batches, settings, and API keys. The app will reload.
+            </p>
+          </div>
+
+          {confirmClearAll ? (
+            <div className="space-y-3 border border-accent-red/30 bg-accent-red/5 p-4">
+              <p className="text-xs font-mono uppercase tracking-[0.18em] text-accent-red">
+                Delete everything? This cannot be undone.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => void handleClearAllData()}
+                  disabled={isClearingAll}
+                  className="utilitarian-button border-accent-red bg-accent-red px-4 py-3 text-xs font-mono uppercase tracking-widest text-white disabled:opacity-60"
+                >
+                  {isClearingAll ? 'Clearing…' : 'Yes, Reset Everything'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearAll(false)}
+                  disabled={isClearingAll}
+                  className="utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+              {clearAllError ? <p className="text-xs font-mono text-accent-red">{clearAllError}</p> : null}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setClearAllError('');
+                setConfirmClearAll(true);
+              }}
+              className="utilitarian-button w-full sm:w-auto px-4 py-3 text-xs font-mono uppercase tracking-widest text-accent-red border-accent-red/40 hover:bg-accent-red hover:text-white hover:border-accent-red"
+            >
+              Reset App Data
+            </button>
+          )}
         </div>
       </div>
 

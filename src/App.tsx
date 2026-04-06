@@ -3,13 +3,13 @@ import { ManualTimerForm } from './components/ManualTimerForm';
 import { DevRecipe, type Session } from './services/recipe';
 import { deletePreset, savePreset, updatePreset } from './services/presets';
 import type { Preset } from './services/presets';
-import { Camera, Sparkles, Info, Library, Settings, Sliders, Github, History as HistoryIcon } from 'lucide-react';
+import { Camera, Sparkles, Info, Library, Settings, Sliders, Github, FlaskConical } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
 import { DEFAULT_SETTINGS, saveAiProvider, saveSettings } from './services/settings';
-import { useStorageReady, useStoredPresets, useStoredSessions, useStoredSettings } from './hooks/useStoredData';
+import { useStorageReady, useStoredPresets, useStoredSessions, useStoredSettings, useStoredChems } from './hooks/useStoredData';
 import { useApiKeySession } from './hooks/useApiKeySession';
-import { clearStoredSessions, saveStoredSession } from './services/storage';
+import { clearStoredSessions, saveStoredSession, saveStoredChem, updateStoredChem, deleteStoredChem, incrementChemRollCount, clearAllData } from './services/storage';
 import type { AIProvider, UserSettings } from './services/userSettings';
 import {
   clearEncryptedApiKeys,
@@ -19,8 +19,9 @@ import {
   unlockEncryptedApiKeys,
 } from './services/secretStorage';
 import type { SettingsSaveRequest } from './components/SettingsMenu';
+import type { StoredChem } from './services/chemTypes';
 
-type View = 'manual' | 'ai' | 'library' | 'history' | 'settings' | 'timer';
+type View = 'manual' | 'ai' | 'library' | 'chems' | 'settings' | 'timer';
 type ToastTone = 'success' | 'error';
 
 interface ToastState {
@@ -32,14 +33,14 @@ interface ToastState {
 const FilmSearch = lazy(() =>
   import('./components/FilmSearch').then((module) => ({ default: module.FilmSearch })),
 );
-const PresetLibrary = lazy(() =>
-  import('./components/PresetLibrary').then((module) => ({ default: module.PresetLibrary })),
+const LibraryView = lazy(() =>
+  import('./components/LibraryView').then((module) => ({ default: module.LibraryView })),
+);
+const ChemsView = lazy(() =>
+  import('./components/ChemsView').then((module) => ({ default: module.ChemsView })),
 );
 const SettingsMenu = lazy(() =>
   import('./components/SettingsMenu').then((module) => ({ default: module.SettingsMenu })),
-);
-const HistoryView = lazy(() =>
-  import('./components/HistoryView').then((module) => ({ default: module.HistoryView })),
 );
 const SessionView = lazy(() =>
   import('./components/SessionView').then((module) => ({ default: module.SessionView })),
@@ -49,10 +50,10 @@ const NAV_ITEMS: { view: View; label: string; Icon: React.FC<{ size?: number; cl
   { view: 'manual',   label: 'Manual',   Icon: Sliders },
   { view: 'ai',       label: 'AI',       Icon: Sparkles },
   { view: 'library',  label: 'Library',  Icon: Library },
-  { view: 'history',  label: 'History',  Icon: HistoryIcon },
+  { view: 'chems',    label: 'Chems',    Icon: FlaskConical },
   { view: 'settings', label: 'Settings', Icon: Settings },
 ];
-const SWIPEABLE_VIEWS: View[] = ['manual', 'ai', 'library', 'history', 'settings'];
+const SWIPEABLE_VIEWS: View[] = ['manual', 'ai', 'library', 'chems', 'settings'];
 
 function getViewIndex(view: View): number {
   return SWIPEABLE_VIEWS.indexOf(view);
@@ -78,6 +79,7 @@ export default function App() {
   const { data: settings, isLoading: settingsLoading } = useStoredSettings(DEFAULT_SETTINGS);
   const { data: presets, isLoading: presetsLoading } = useStoredPresets();
   const { data: sessions, isLoading: sessionsLoading } = useStoredSessions();
+  const { data: chems } = useStoredChems();
   const {
     apiKeys,
     hasEncryptedApiKeys,
@@ -247,6 +249,16 @@ export default function App() {
   const handleSaveSession = async (session: Session) => {
     try {
       await saveStoredSession(session);
+
+      if (settings.autoTrackChemRolls && session.status === 'completed') {
+        const devName = session.recipe.developer.toLowerCase().trim();
+        const match = chems.find(
+          (c) => c.type === 'developer' && c.name.toLowerCase().trim() === devName,
+        );
+        if (match) {
+          await incrementChemRollCount(match.id);
+        }
+      }
     } catch (error) {
       console.error('Failed to save session history entry:', error);
       notify('Session history could not be saved.', 'error');
@@ -261,6 +273,28 @@ export default function App() {
       console.error('Failed to clear session history:', error);
       throw error;
     }
+  };
+
+  const handleClearAllData = async () => {
+    await clearAllData();
+  };
+
+  const handleAddChem = async (data: Omit<StoredChem, 'id' | 'createdAt'>) => {
+    await saveStoredChem(data);
+    notify('Chemistry added.');
+  };
+
+  const handleUpdateChem = async (id: string, patch: Partial<Omit<StoredChem, 'id' | 'createdAt'>>) => {
+    await updateStoredChem(id, patch);
+  };
+
+  const handleDeleteChem = async (id: string) => {
+    await deleteStoredChem(id);
+    notify('Chemistry removed.');
+  };
+
+  const handleIncrementChem = async (id: string) => {
+    await incrementChemRollCount(id);
   };
 
   const activeView = view === 'timer' ? 'manual' : view;
@@ -400,13 +434,36 @@ export default function App() {
               >
                 <div className="text-center space-y-2">
                   <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Library</h1>
-                  <p className="mono-label">Your saved presets</p>
+                  <p className="mono-label">Your saved presets and session history</p>
                 </div>
-                <PresetLibrary
+                <LibraryView
                   presets={presets}
+                  sessions={sessions}
                   onSelect={handleStartTimer}
                   onDelete={handleDeletePreset}
                   onEdit={handleEditPreset}
+                />
+              </motion.div>
+            </Suspense>
+          )}
+
+          {view === 'chems' && (
+            <Suspense fallback={<ViewLoader label="Loading chemistry" />}>
+              <motion.div
+                key="chems"
+                {...viewMotion}
+                className="w-full flex flex-col items-center space-y-6 md:space-y-8"
+              >
+                <div className="text-center space-y-2">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Chemistry</h1>
+                  <p className="mono-label">Track your developers and fixers</p>
+                </div>
+                <ChemsView
+                  chems={chems}
+                  onAdd={handleAddChem}
+                  onUpdate={handleUpdateChem}
+                  onDelete={handleDeleteChem}
+                  onIncrement={handleIncrementChem}
                 />
               </motion.div>
             </Suspense>
@@ -428,6 +485,7 @@ export default function App() {
                   hasEncryptedApiKeys={hasEncryptedApiKeys}
                   isVaultLocked={isApiKeyVaultLocked}
                   onClearHistory={handleClearHistory}
+                  onClearAllData={handleClearAllData}
                   onForgetSavedKeys={handleForgetSavedKeys}
                   onSettingsChange={handleUpdateSettings}
                   onSave={handleSaveSettings}
@@ -435,22 +493,6 @@ export default function App() {
                   sessionCount={sessions.length}
                   settings={settings}
                 />
-              </motion.div>
-            </Suspense>
-          )}
-
-          {view === 'history' && (
-            <Suspense fallback={<ViewLoader label="Loading history" />}>
-              <motion.div
-                key="history"
-                {...viewMotion}
-                className="w-full flex flex-col items-center space-y-6 md:space-y-8"
-              >
-                <div className="text-center space-y-2">
-                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">History</h1>
-                  <p className="mono-label">Your recent development sessions</p>
-                </div>
-                <HistoryView sessions={sessions} />
               </motion.div>
             </Suspense>
           )}
@@ -557,15 +599,15 @@ export default function App() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Library</p>
-                  <p>Save recipes from Manual or AI mode to keep them here. Tap any preset to jump straight into a timer session.</p>
+                  <p>Save recipes from Manual or AI mode to keep them here. Switch to the History tab to review completed and interrupted sessions on-device.</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-white uppercase tracking-widest text-xs">History</p>
-                  <p>DarkTimer saves completed and interrupted timer runs locally so you can review recent development sessions on-device.</p>
+                  <p className="text-white uppercase tracking-widest text-xs">Chems</p>
+                  <p>Track your chemistry batches — add developers and fixers, record their mix date, expiration, and roll count. Warnings appear when a batch is aging or nearing capacity.</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-white uppercase tracking-widest text-xs">Settings</p>
-                  <p>Set your development defaults, choose your AI provider, add your API keys, manage notifications, and clear session history.</p>
+                  <p>Set your development defaults, choose your AI provider, add your API keys, manage notifications, configure chemistry roll-count warnings, and clear session history.</p>
                 </div>
               </div>
             </motion.div>

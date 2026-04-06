@@ -21,6 +21,7 @@ export interface UserSettings {
   phaseCountdown: PhaseCountdown;
   agitationFlashEnabled: boolean;
   agitationVibrationEnabled: boolean;
+  autoTrackChemRolls: boolean;
 }
 
 export const DEFAULT_BW_TEMP_C = 20;
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   phaseCountdown: 10,
   agitationFlashEnabled: true,
   agitationVibrationEnabled: false,
+  autoTrackChemRolls: false,
 };
 
 function clampNumber(value: unknown, fallback: number): number {
@@ -90,6 +92,10 @@ export function normalizeSettings(value: unknown): UserSettings {
       typeof parsed.agitationVibrationEnabled === 'boolean'
         ? parsed.agitationVibrationEnabled
         : DEFAULT_SETTINGS.agitationVibrationEnabled,
+    autoTrackChemRolls:
+      typeof parsed.autoTrackChemRolls === 'boolean'
+        ? parsed.autoTrackChemRolls
+        : DEFAULT_SETTINGS.autoTrackChemRolls,
   };
 }
 

@@ -3,8 +3,9 @@
   "configurations": [
     {
       "name": "DarkTimer",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["/usr/local/bin/npm", "run", "dev"],
+      "env": { "PATH": "/usr/local/bin:/usr/bin:/bin" },
       "port": 3000
     }
   ]
