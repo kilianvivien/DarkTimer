@@ -114,7 +114,6 @@ export const Timer: React.FC<TimerProps> = ({
   const hasProgressRef = useRef(false);
   const phasesCompletedRef = useRef(initialSession?.currentPhaseIndex ?? 0);
   const sessionReportedRef = useRef(false);
-  const fullscreenRequestInFlightRef = useRef(false);
 
   const AGITATION_ALERT_SECONDS = 5;
   const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
@@ -239,33 +238,13 @@ export const Timer: React.FC<TimerProps> = ({
     }
   };
 
-  const handleEnterFullscreen = async () => {
-    if (fullscreenRequestInFlightRef.current) {
-      return;
-    }
-
-    fullscreenRequestInFlightRef.current = true;
-
-    try {
-      await requestFullscreen();
-    } finally {
-      fullscreenRequestInFlightRef.current = false;
-    }
-  };
-
   const handleFullscreenButtonPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-
-    if (event.pointerType === 'mouse' && event.button !== 0) {
-      return;
-    }
-
-    void handleEnterFullscreen();
   };
 
   const handleFullscreenButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    void handleEnterFullscreen();
+    void requestFullscreen();
   };
 
   const playBeep = (freq: number, duration: number) => {

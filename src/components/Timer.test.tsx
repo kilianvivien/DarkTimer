@@ -214,8 +214,8 @@ describe('Timer', () => {
     }
   });
 
-  it('enters fullscreen from the dedicated fullscreen button', async () => {
-    render(
+  it('enters fullscreen from the dedicated fullscreen button, including after compensation changes', async () => {
+    const { rerender } = render(
       <Timer
         recipeSnapshot={recipe}
         phases={phases}
@@ -226,11 +226,21 @@ describe('Timer', () => {
       />,
     );
 
+    rerender(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={[{ ...phases[0], duration: 3 }, phases[1]]}
+        compensationAddedSeconds={1}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+      />,
+    );
+
     await act(async () => {
-      fireEvent.pointerDown(screen.getByRole('button', { name: /enter fullscreen/i }), {
-        button: 0,
-        pointerType: 'mouse',
-      });
+      fireEvent.pointerDown(screen.getByRole('button', { name: /enter fullscreen/i }));
+      fireEvent.click(screen.getByRole('button', { name: /enter fullscreen/i }));
       await Promise.resolve();
     });
 
