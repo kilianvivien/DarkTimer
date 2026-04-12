@@ -3,6 +3,9 @@ import { ChevronLeft } from 'lucide-react';
 import { DevRecipe, formatTemperature, getProcessLabel, type Session } from '../services/recipe';
 import { Timer, type TimerSessionResult } from './Timer';
 import type { UserSettings } from '../services/userSettings';
+import { useStoredChems } from '../hooks/useStoredData';
+import { applyDeveloperCompensation } from '../lib/utils';
+import { DeveloperCompensationInput, type CompensationMode } from './DeveloperCompensationInput';
 
 interface SessionViewProps {
   recipe: DevRecipe | null;
@@ -20,14 +23,41 @@ export const SessionView: React.FC<SessionViewProps> = ({
   const [sessionKey, setSessionKey] = React.useState(0);
   const [isComplete, setIsComplete] = React.useState(false);
 
+  const [compMode, setCompMode] = React.useState<CompensationMode>('off');
+  const [customPercent, setCustomPercent] = React.useState(0);
+  const [perRollPercent, setPerRollPercent] = React.useState(2);
+
+  const { data: chems } = useStoredChems();
+
   React.useEffect(() => {
     setSessionKey(0);
     setIsComplete(false);
+    setCompMode('off');
+    setCustomPercent(0);
+    setPerRollPercent(10);
   }, [recipe]);
 
   if (!recipe) {
     return null;
   }
+
+  const matchedChem = chems.find(
+    (c) => c.type === 'developer' && c.name.toLowerCase() === recipe.developer.toLowerCase(),
+  ) ?? null;
+
+  const totalPercent =
+    compMode === 'custom'
+      ? customPercent
+      : compMode === 'chems'
+        ? perRollPercent * (matchedChem?.rollCount ?? 0)
+        : 0;
+
+  const developerPhase = recipe.phases.find((p) => p.name.toLowerCase() === 'developer');
+  const addedSeconds = developerPhase
+    ? Math.round(developerPhase.duration * totalPercent / 100)
+    : 0;
+
+  const compensatedPhases = applyDeveloperCompensation(recipe.phases, totalPercent);
 
   const handleSessionEnd = async (result: TimerSessionResult) => {
     await onSaveSession({
@@ -53,7 +83,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
           <span>Exit Session</span>
         </button>
 
-        <div className="bg-dark-panel p-4 utilitarian-border">
+        <div className="bg-dark-panel p-4 utilitarian-border space-y-4">
           {/* Always-visible compact row */}
           <div className="flex justify-between items-center gap-4">
             <div className="min-w-0">
@@ -75,12 +105,29 @@ export const SessionView: React.FC<SessionViewProps> = ({
 
           {/* Source + notes hidden in landscape to save vertical space */}
           {recipe.source && (
-            <div className="pt-3 mt-3 border-t border-dark-border landscape:hidden">
+            <div className="pt-3 border-t border-dark-border landscape:hidden">
               <p className="mono-label mb-1">Source</p>
               <p className="text-xs text-ui-gray font-mono">{recipe.source}</p>
             </div>
           )}
 
+          {/* Compensation panel — only show before session starts */}
+          {!isComplete && developerPhase && (
+            <div className="pt-3 border-t border-dark-border">
+              <DeveloperCompensationInput
+                developerName={recipe.developer}
+                mode={compMode}
+                customPercent={customPercent}
+                perRollPercent={perRollPercent}
+                matchedChem={matchedChem}
+                totalPercent={totalPercent}
+                addedSeconds={addedSeconds}
+                onModeChange={setCompMode}
+                onCustomPercentChange={setCustomPercent}
+                onPerRollPercentChange={setPerRollPercent}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -119,7 +166,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
         <div className="w-full">
           <Timer
             key={sessionKey}
-            phases={recipe.phases}
+            phases={compensatedPhases}
+            compensationAddedSeconds={addedSeconds}
             onComplete={() => setIsComplete(true)}
             onExitSession={onExit}
             onSessionEnd={handleSessionEnd}

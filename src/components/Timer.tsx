@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X } from 'lucide-react';
+import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X, Play, Pause } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
 import {
+  AgitationMode,
   DevPhase,
   getAgitationDescription,
+  getAgitationLabel,
   getAgitationInterval,
   type SessionStatus,
 } from '../services/recipe';
@@ -20,6 +22,7 @@ export interface TimerSessionResult {
 
 interface TimerProps {
   phases: DevPhase[];
+  compensationAddedSeconds?: number;
   onComplete: () => void;
   onExitSession: () => void;
   onSessionEnd: (result: TimerSessionResult) => Promise<void> | void;
@@ -28,6 +31,7 @@ interface TimerProps {
 
 export const Timer: React.FC<TimerProps> = ({
   phases,
+  compensationAddedSeconds = 0,
   onComplete,
   onExitSession,
   onSessionEnd,
@@ -45,6 +49,7 @@ export const Timer: React.FC<TimerProps> = ({
   const [flashKey, setFlashKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImmersiveFallback, setIsImmersiveFallback] = useState(false);
+  const [agitationOverride, setAgitationOverride] = useState<AgitationMode | null>(null);
   const isMutedRef = useRef(isMuted);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ownsFullscreenRef = useRef(false);
@@ -260,6 +265,7 @@ export const Timer: React.FC<TimerProps> = ({
     setTimeLeft(phases[currentPhaseIndex].duration);
     setIsAgitating(false);
     setFlashVisible(false);
+    setAgitationOverride(null);
     lastAgitationCueRef.current = null;
   }, [phases, currentPhaseIndex]);
 
@@ -314,7 +320,8 @@ export const Timer: React.FC<TimerProps> = ({
     }
 
     const currentPhase = phases[currentPhaseIndex];
-    const agitationInterval = getAgitationInterval(currentPhase.agitationMode);
+    const effectiveMode = agitationOverride ?? currentPhase.agitationMode;
+    const agitationInterval = getAgitationInterval(effectiveMode);
 
     if (!agitationInterval) {
       setIsAgitating(false);
@@ -324,7 +331,7 @@ export const Timer: React.FC<TimerProps> = ({
     const elapsed = currentPhase.duration - timeLeft;
     const cycleTime = elapsed % agitationInterval;
     const agitating = elapsed > 0 && cycleTime < AGITATION_ALERT_SECONDS;
-    const agitationDetails = currentPhase.agitation ?? getAgitationDescription(currentPhase.agitationMode);
+    const agitationDetails = getAgitationDescription(effectiveMode);
 
     if (elapsed > 0 && cycleTime === 0) {
       const cueKey = `${currentPhaseIndex}:${Math.floor(elapsed / agitationInterval)}`;
@@ -342,7 +349,7 @@ export const Timer: React.FC<TimerProps> = ({
 
     setIsAgitating(agitating);
 
-  }, [currentPhaseIndex, isActive, notificationsEnabled, phases, timeLeft]);
+  }, [agitationOverride, currentPhaseIndex, isActive, notificationsEnabled, phases, timeLeft]);
 
   // Pre-start countdown
   useEffect(() => {
@@ -440,11 +447,17 @@ export const Timer: React.FC<TimerProps> = ({
 
   const currentPhase = phases[currentPhaseIndex];
   const progress = currentPhase && currentPhase.duration > 0 ? (timeLeft / currentPhase.duration) * 100 : 0;
-  const agitationDetails = currentPhase?.agitation ?? getAgitationDescription(currentPhase?.agitationMode);
-  const portraitControlsClassName = isImmersiveMode
-    ? "grid grid-cols-[2.75rem_2.75rem_minmax(0,1fr)_2.75rem] items-center justify-center gap-2"
-    : "grid grid-cols-[2.75rem_2.75rem_minmax(0,1fr)_2.75rem_2.75rem] items-center justify-center gap-2";
+  const effectiveAgitationMode = agitationOverride ?? currentPhase?.agitationMode ?? null;
+  const agitationDetails = getAgitationDescription(effectiveAgitationMode);
 
+  const AGITATION_CYCLE: AgitationMode[] = ['every-60s', 'every-30s', 'stand'];
+  const cycleAgitation = () => {
+    const current = effectiveAgitationMode ?? 'stand';
+    const idx = AGITATION_CYCLE.indexOf(current);
+    const next = AGITATION_CYCLE[(idx + 1) % AGITATION_CYCLE.length];
+    lastAgitationCueRef.current = null; // reset so next cycle fires fresh
+    setAgitationOverride(next);
+  };
   return (
     <motion.div
       ref={containerRef}
@@ -506,19 +519,52 @@ export const Timer: React.FC<TimerProps> = ({
           </motion.h1>
         </div>
 
-        <div className="relative flex flex-col items-center justify-center w-full">
-          <AnimatePresence>
-            {isAgitating && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.2 }}
-                className="absolute -top-5 text-accent-red font-mono text-[10px] uppercase tracking-[0.4em] font-bold"
-              >
-                Agitating
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* Portrait-only Start/Pause — sits above the countdown so it's always in thumb reach */}
+        <button
+          onClick={toggleTimer}
+          className={cn(
+            "press-feedback landscape:hidden w-full py-5 font-bold uppercase tracking-[0.2em] text-base transition-all flex items-center justify-center gap-3",
+            countdown !== null
+              ? "border border-dark-border text-ui-gray hover:text-white hover:border-white"
+              : isActive
+                ? "border border-white/20 bg-white/5 text-white hover:bg-white/10"
+                : "bg-white text-black hover:bg-accent-red hover:text-white hover:border-accent-red"
+          )}
+        >
+          {countdown !== null ? (
+            <>
+              <X size={16} />
+              <span>Cancel</span>
+            </>
+          ) : isActive ? (
+            <>
+              <Pause size={16} fill="currentColor" />
+              <span>Pause</span>
+            </>
+          ) : (
+            <>
+              <Play size={16} fill="currentColor" />
+              <span>Start</span>
+            </>
+          )}
+        </button>
+
+        <div className="flex flex-col items-center justify-center w-full">
+          {/* Reserved row for "AGITATING" so it never overlaps the button above */}
+          <div className="h-5 flex items-center justify-center">
+            <AnimatePresence>
+              {isAgitating && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.2 }}
+                  className="text-accent-red font-mono text-[10px] uppercase tracking-[0.4em] font-bold"
+                >
+                  Agitating
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           <AnimatePresence mode="wait">
             {countdown !== null ? (
@@ -553,6 +599,12 @@ export const Timer: React.FC<TimerProps> = ({
             )}
           </AnimatePresence>
 
+          {compensationAddedSeconds > 0 && currentPhase?.name.toLowerCase() === 'developer' && countdown === null && (
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ui-gray -mt-2 mb-1">
+              +{formatTime(compensationAddedSeconds)} reuse comp.
+            </p>
+          )}
+
           <div className="w-full h-px bg-dark-border relative overflow-hidden">
             <motion.div
               className={cn("absolute top-0 left-0 h-full", isAgitating ? "bg-white" : "bg-accent-red")}
@@ -566,59 +618,63 @@ export const Timer: React.FC<TimerProps> = ({
       {/* Right / sidebar: agitation + controls + upcoming */}
       <div className="relative flex flex-col landscape:justify-between landscape:w-64 landscape:border-l landscape:border-dark-border p-4 sm:p-6 landscape:p-5 space-y-5 sm:space-y-6 landscape:space-y-4 border-t landscape:border-t-0 border-dark-border">
 
-        {agitationDetails && (
-          <div className={cn(
-            "p-3 utilitarian-border transition-colors",
-            isAgitating ? "bg-accent-red/10 border-accent-red/50" : "bg-dark-bg border-dark-border"
-          )}>
-            <p className="mono-label mb-1">Agitation</p>
-            <p className="text-xs text-ui-gray italic leading-relaxed" role="alert">{agitationDetails}</p>
-          </div>
+        {currentPhase && (
+          <button
+            type="button"
+            onClick={cycleAgitation}
+            className={cn(
+              "w-full text-left px-4 py-4 utilitarian-border transition-colors",
+              isAgitating ? "bg-accent-red/10 border-accent-red/50" : "bg-dark-bg border-dark-border"
+            )}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="mono-label">Agitation</p>
+              <span className="font-mono text-xs uppercase tracking-wider text-ui-gray">
+                {getAgitationLabel(AGITATION_CYCLE[(AGITATION_CYCLE.indexOf(effectiveAgitationMode ?? 'stand') + 1) % AGITATION_CYCLE.length])} →
+              </span>
+            </div>
+            <p className="text-sm text-ui-gray italic leading-relaxed" role="alert">
+              {agitationDetails ?? 'Stand — no agitation.'}
+            </p>
+          </button>
         )}
 
-        {/* Portrait: single row. Landscape: Start full-width, icon buttons below */}
-        <div className="flex flex-col gap-0 landscape:gap-2">
+        {/* Controls */}
+        <div className="flex flex-col gap-2">
+          {/* Landscape-only Start button */}
           <button
             onClick={toggleTimer}
             className={cn(
-              "press-feedback w-full py-3 font-bold uppercase tracking-widest text-sm transition-all hidden landscape:block",
-              isActive ? "bg-dark-border text-white" : "bg-white text-black hover:bg-accent-red hover:text-white"
+              "press-feedback w-full py-3 font-bold uppercase tracking-[0.2em] text-sm transition-all hidden landscape:flex items-center justify-center gap-2",
+              countdown !== null
+                ? "border border-dark-border text-ui-gray hover:text-white hover:border-white"
+                : isActive
+                  ? "border border-white/20 bg-white/5 text-white hover:bg-white/10"
+                  : "bg-white text-black hover:bg-accent-red hover:text-white"
             )}
           >
-            {countdown !== null ? 'Cancel' : isActive ? 'Pause' : 'Start'}
+            {countdown !== null ? <><X size={14} /><span>Cancel</span></> : isActive ? <><Pause size={14} fill="currentColor" /><span>Pause</span></> : <><Play size={14} fill="currentColor" /><span>Start</span></>}
           </button>
-          <div
-            className={cn(
-              portraitControlsClassName,
-              "landscape:flex landscape:items-center landscape:justify-between landscape:space-x-0"
-            )}
-          >
+
+          {/* Icon buttons — portrait and landscape */}
+          <div className="flex items-center justify-center gap-3 landscape:gap-2">
             <button
               onClick={toggleMute}
-              className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+              className="utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0"
               aria-label={isMuted ? 'Unmute timer sounds' : 'Mute timer sounds'}
             >
               {isMuted ? <BellOff size={16} /> : <Bell size={16} />}
             </button>
             <button
               onClick={resetTimer}
-              className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+              className="utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0"
               aria-label="Reset current phase"
             >
               <RotateCcw size={16} />
             </button>
             <button
-              onClick={toggleTimer}
-              className={cn(
-                "press-feedback landscape:hidden min-w-0 px-3 py-3 font-bold uppercase tracking-[0.18em] text-[0.78rem] transition-all",
-                isActive ? "bg-dark-border text-white" : "bg-white text-black hover:bg-accent-red hover:text-white"
-              )}
-            >
-              {countdown !== null ? 'Cancel' : isActive ? 'Pause' : 'Start'}
-            </button>
-            <button
               onClick={skipPhase}
-              className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+              className="utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0"
               aria-label="Skip current phase"
             >
               <SkipForward size={16} />
@@ -626,7 +682,7 @@ export const Timer: React.FC<TimerProps> = ({
             {!isImmersiveMode && (
               <button
                 onClick={() => void requestFullscreen()}
-                className="utilitarian-button flex h-11 w-11 min-w-0 items-center justify-center px-0 py-0 sm:h-12 sm:w-12"
+                className="utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0"
                 aria-label="Enter fullscreen"
               >
                 <Maximize size={16} />

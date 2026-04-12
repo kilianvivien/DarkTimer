@@ -524,7 +524,7 @@ export default function App() {
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
                 animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="w-full"
+                className="w-full max-w-2xl mx-auto"
               >
                 <SessionView
                   recipe={recipe}
