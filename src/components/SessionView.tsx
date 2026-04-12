@@ -34,7 +34,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
     setIsComplete(false);
     setCompMode('off');
     setCustomPercent(0);
-    setPerRollPercent(10);
+    setPerRollPercent(2);
   }, [recipe]);
 
   if (!recipe) {
