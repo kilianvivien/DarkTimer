@@ -15,6 +15,44 @@ import { showNotification } from '../services/notifications';
 import { clearStoredActiveTimerSession, saveStoredActiveTimerSession } from '../services/storage';
 import type { UserSettings } from '../services/userSettings';
 
+type TauriWindowHandle = {
+  isFullscreen: () => Promise<boolean>;
+  setFullscreen: (fullscreen: boolean) => Promise<void>;
+};
+
+let tauriWindowHandlePromise: Promise<TauriWindowHandle | null> | null = null;
+
+const isTauriRuntime = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const tauriWindow = window as Window & {
+    __TAURI_INTERNALS__?: unknown;
+    isTauri?: boolean;
+  };
+
+  return Boolean(tauriWindow.__TAURI_INTERNALS__ || tauriWindow.isTauri);
+};
+
+const getTauriWindowHandle = async (): Promise<TauriWindowHandle | null> => {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+
+  if (!tauriWindowHandlePromise) {
+    tauriWindowHandlePromise = import('@tauri-apps/api/window')
+      .then(({ getCurrentWindow }) => getCurrentWindow())
+      .catch((error) => {
+        console.error('Failed to load Tauri window API:', error);
+        tauriWindowHandlePromise = null;
+        return null;
+      });
+  }
+
+  return tauriWindowHandlePromise;
+};
+
 export interface TimerSessionResult {
   startTime: number;
   endTime: number;
@@ -76,6 +114,7 @@ export const Timer: React.FC<TimerProps> = ({
   const hasProgressRef = useRef(false);
   const phasesCompletedRef = useRef(initialSession?.currentPhaseIndex ?? 0);
   const sessionReportedRef = useRef(false);
+  const fullscreenRequestInFlightRef = useRef(false);
 
   const AGITATION_ALERT_SECONDS = 5;
   const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
@@ -137,14 +176,22 @@ export const Timer: React.FC<TimerProps> = ({
   const exitFullscreen = async () => {
     setIsImmersiveFallback(false);
 
-    if (!ownsFullscreenRef.current || typeof document === 'undefined' || !document.exitFullscreen) {
+    if (!ownsFullscreenRef.current) {
       ownsFullscreenRef.current = false;
       return;
     }
 
     try {
-      if (document.fullscreenElement) {
+      if (typeof document !== 'undefined' && document.exitFullscreen && document.fullscreenElement) {
         await document.exitFullscreen();
+        setIsFullscreen(false);
+        return;
+      }
+
+      const tauriWindow = await getTauriWindowHandle();
+      if (tauriWindow && (await tauriWindow.isFullscreen())) {
+        await tauriWindow.setFullscreen(false);
+        setIsFullscreen(false);
       }
     } catch (error) {
       console.error('Failed to exit fullscreen:', error);
@@ -170,6 +217,19 @@ export const Timer: React.FC<TimerProps> = ({
       ownsFullscreenRef.current = true;
       setIsImmersiveFallback(false);
     } catch (error) {
+      const tauriWindow = await getTauriWindowHandle();
+      if (tauriWindow) {
+        try {
+          await tauriWindow.setFullscreen(true);
+          ownsFullscreenRef.current = true;
+          setIsFullscreen(true);
+          setIsImmersiveFallback(false);
+          return;
+        } catch (tauriError) {
+          console.error('Failed to enter native fullscreen:', tauriError);
+        }
+      }
+
       if (canUseImmersiveFallback()) {
         setIsImmersiveFallback(true);
         return;
@@ -177,6 +237,35 @@ export const Timer: React.FC<TimerProps> = ({
 
       console.error('Failed to enter fullscreen:', error);
     }
+  };
+
+  const handleEnterFullscreen = async () => {
+    if (fullscreenRequestInFlightRef.current) {
+      return;
+    }
+
+    fullscreenRequestInFlightRef.current = true;
+
+    try {
+      await requestFullscreen();
+    } finally {
+      fullscreenRequestInFlightRef.current = false;
+    }
+  };
+
+  const handleFullscreenButtonPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+
+    void handleEnterFullscreen();
+  };
+
+  const handleFullscreenButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    void handleEnterFullscreen();
   };
 
   const playBeep = (freq: number, duration: number) => {
@@ -877,7 +966,9 @@ export const Timer: React.FC<TimerProps> = ({
             </button>
             {!isImmersiveMode && (
               <button
-                onClick={() => void requestFullscreen()}
+                type="button"
+                onPointerDown={handleFullscreenButtonPointerDown}
+                onClick={handleFullscreenButtonClick}
                 className="utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0"
                 aria-label="Enter fullscreen"
               >

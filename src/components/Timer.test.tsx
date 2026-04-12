@@ -214,6 +214,29 @@ describe('Timer', () => {
     }
   });
 
+  it('enters fullscreen from the dedicated fullscreen button', async () => {
+    render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={phases}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.pointerDown(screen.getByRole('button', { name: /enter fullscreen/i }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: /leave fullscreen/i })).toBeInTheDocument();
+  });
+
   it('suppresses audio side effects while muted', async () => {
     const oscillatorStart = vi.fn();
 
