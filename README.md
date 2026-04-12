@@ -6,7 +6,7 @@ A utilitarian darkroom timer for analog film development. Look up development re
 
 ---
 
-![DarkTimer screenshots showing the timer, AI assistant, and chemistry views](Docs/screenshots.png)
+![DarkTimer screenshots showing the timer, AI assistant, and chemistry views](.github/assets/screenshots.png)
 
 ---
 
