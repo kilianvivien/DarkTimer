@@ -393,9 +393,7 @@ describe('FilmSearch', () => {
     });
     fireEvent.touchEnd(aiSearch);
 
-    await waitFor(() => {
-      expect(screen.queryByText(/gemini found 1 option/i)).not.toBeInTheDocument();
-    });
+    expect(screen.queryByText(/gemini found 1 option/i)).not.toBeInTheDocument();
     expect(getDevTimesMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
   });

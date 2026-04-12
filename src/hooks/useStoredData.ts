@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Preset } from '../services/presetTypes';
-import type { Session } from '../services/recipe';
+import type { ActiveTimerSession, Session } from '../services/recipe';
 import {
   initStorage,
   subscribeToStorage,
@@ -8,6 +8,7 @@ import {
   getStoredSessions,
   getStoredSettings,
   getStoredChems,
+  getStoredActiveTimerSession,
   saveStoredSettings,
 } from '../services/storage';
 import type { StoredChem } from '../services/chemTypes';
@@ -117,6 +118,14 @@ export function useStoredChems(): AsyncState<StoredChem[]> {
     useCallback(() => getStoredChems(), []),
     useCallback((listener: () => void) => subscribeToStorage('chems', listener), []),
     [],
+  );
+}
+
+export function useStoredActiveTimerSession(): AsyncState<ActiveTimerSession | null> {
+  return useStoredResource(
+    useCallback(() => getStoredActiveTimerSession(), []),
+    useCallback((listener: () => void) => subscribeToStorage('activeTimer', listener), []),
+    null,
   );
 }
 

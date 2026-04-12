@@ -3,13 +3,45 @@ import { ManualTimerForm } from './components/ManualTimerForm';
 import { DevRecipe, type Session } from './services/recipe';
 import { deletePreset, savePreset, updatePreset } from './services/presets';
 import type { Preset } from './services/presets';
-import { Camera, Sparkles, Info, Library, Settings, Sliders, Github, FlaskConical } from 'lucide-react';
+import {
+  Camera,
+  Sparkles,
+  Info,
+  Library,
+  Settings,
+  Sliders,
+  Github,
+  FlaskConical,
+  Ellipsis,
+  Share,
+  Plus,
+  ToggleRight,
+  House,
+  Menu,
+  Download,
+} from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
 import { DEFAULT_SETTINGS, saveAiProvider, saveSettings } from './services/settings';
-import { useStorageReady, useStoredPresets, useStoredSessions, useStoredSettings, useStoredChems } from './hooks/useStoredData';
+import {
+  useStorageReady,
+  useStoredActiveTimerSession,
+  useStoredPresets,
+  useStoredSessions,
+  useStoredSettings,
+  useStoredChems,
+} from './hooks/useStoredData';
 import { useApiKeySession } from './hooks/useApiKeySession';
-import { clearStoredSessions, saveStoredSession, saveStoredChem, updateStoredChem, deleteStoredChem, incrementChemRollCount, clearAllData } from './services/storage';
+import {
+  clearStoredActiveTimerSession,
+  clearStoredSessions,
+  saveStoredSession,
+  saveStoredChem,
+  updateStoredChem,
+  deleteStoredChem,
+  incrementChemRollCount,
+  clearAllData,
+} from './services/storage';
 import type { AIProvider, UserSettings } from './services/userSettings';
 import {
   clearEncryptedApiKeys,
@@ -24,8 +56,12 @@ import {
   applyPwaUpdate,
   dismissPwaUpdatePrompt,
   getPwaUpdateSnapshot,
+  dismissPwaInstallPrompt,
+  getInstallInstructions,
+  requestPwaInstall,
   subscribeToPwaUpdates,
 } from './services/pwa';
+import type { ActiveTimerSession } from './services/recipe';
 
 type View = 'manual' | 'ai' | 'library' | 'chems' | 'settings' | 'timer';
 type ToastTone = 'success' | 'error';
@@ -73,6 +109,16 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest('button, a, input, select, textarea, label, [role="button"]'));
 }
 
+const INSTALL_STEP_ICONS = {
+  ellipsis: Ellipsis,
+  share: Share,
+  plus: Plus,
+  toggle: ToggleRight,
+  home: House,
+  menu: Menu,
+  download: Download,
+} as const;
+
 export default function App() {
   const [recipe, setRecipe] = useState<DevRecipe | null>(null);
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
@@ -86,6 +132,7 @@ export default function App() {
   const { data: presets, isLoading: presetsLoading } = useStoredPresets();
   const { data: sessions, isLoading: sessionsLoading } = useStoredSessions();
   const { data: chems } = useStoredChems();
+  const { data: activeTimerSession, isLoading: activeTimerLoading } = useStoredActiveTimerSession();
   const {
     apiKeys,
     hasEncryptedApiKeys,
@@ -98,7 +145,15 @@ export default function App() {
     getPwaUpdateSnapshot,
     getPwaUpdateSnapshot,
   );
-  const appReady = storageReady && !settingsLoading && !presetsLoading && !sessionsLoading && apiKeysReady;
+  const appReady =
+    storageReady &&
+    !settingsLoading &&
+    !presetsLoading &&
+    !sessionsLoading &&
+    !activeTimerLoading &&
+    apiKeysReady;
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [resumeSession, setResumeSession] = useState<ActiveTimerSession | null>(null);
 
   const notify = useCallback((message: string, tone: ToastTone = 'success') => {
     setToast({
@@ -131,7 +186,16 @@ export default function App() {
     dismissApiKeyMigrationNotice();
   }, [migrationNotice, notify]);
 
+  useEffect(() => {
+    if (!activeTimerSession || view === 'timer' || recipe) {
+      return;
+    }
+
+    setResumeSession(activeTimerSession);
+  }, [activeTimerSession, recipe, view]);
+
   const handleStartTimer = (newRecipe: DevRecipe) => {
+    setResumeSession(null);
     setEditingPreset(null);
     setRecipe(newRecipe);
     setNavDirection(1);
@@ -139,6 +203,7 @@ export default function App() {
   };
 
   const reset = () => {
+    setResumeSession(null);
     setEditingPreset(null);
     setRecipe(null);
     setNavDirection(-1);
@@ -316,6 +381,48 @@ export default function App() {
       notify('Update could not be applied. Close and reopen DarkTimer to try again.', 'error');
     }
   };
+
+  const handleResumeStoredSession = () => {
+    if (!resumeSession) {
+      return;
+    }
+
+    setRecipe(resumeSession.recipe);
+    setNavDirection(1);
+    startTransition(() => setView('timer'));
+  };
+
+  const handleDiscardStoredSession = async () => {
+    try {
+      await clearStoredActiveTimerSession();
+      setResumeSession(null);
+      notify('Discarded the interrupted timer session.');
+    } catch (error) {
+      console.error('Failed to discard the interrupted timer session:', error);
+      notify('Could not discard the interrupted timer session.', 'error');
+    }
+  };
+
+  const handleInstallAction = async () => {
+    const outcome = await requestPwaInstall();
+    if (outcome === 'accepted') {
+      notify('DarkTimer is being installed.');
+      return;
+    }
+
+    if (outcome === 'dismissed') {
+      return;
+    }
+
+    setShowInstallHelp(true);
+  };
+
+  const installInstructions = getInstallInstructions(pwaUpdate.installPlatform);
+  const showInstallBanner =
+    !pwaUpdate.isStandalone &&
+    !pwaUpdate.isInstallDismissed &&
+    !pwaUpdate.needRefresh &&
+    (pwaUpdate.isInstallPromptAvailable || installInstructions);
 
   const activeView = view === 'timer' ? 'manual' : view;
   const viewMotion = reduceMotion
@@ -528,6 +635,7 @@ export default function App() {
               >
                 <SessionView
                   recipe={recipe}
+                  initialSession={resumeSession}
                   onExit={reset}
                   onSaveSession={handleSaveSession}
                   settings={settings}
@@ -636,6 +744,63 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {!pwaUpdate.isOnline && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="fixed inset-x-4 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[60] md:inset-x-auto md:right-6 md:w-[24rem]"
+            aria-live="polite"
+          >
+            <div className="rounded-2xl border border-accent-red/35 bg-black/80 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,0,0,0.08),0_18px_48px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-accent-red">Offline</p>
+              <p className="mt-1 text-sm leading-relaxed text-white/75">
+                Manual recipes, your saved presets, chemistry, and timers still work. AI lookups use cached results when available.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showInstallBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+11rem)] z-[60] md:inset-x-auto md:right-6 md:bottom-36 md:w-[26rem]"
+            aria-live="polite"
+          >
+            <div className="rounded-[1.75rem] border border-accent-red/25 bg-black/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_64px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+              <div className="space-y-2">
+                <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-accent-red">Install DarkTimer</p>
+                <h2 className="text-base font-semibold tracking-tight text-white">Keep DarkTimer one tap away.</h2>
+                <p className="text-sm leading-relaxed text-white/72">
+                  Install the app for a more native timer experience, easier relaunching, and cleaner fullscreen behavior.
+                </p>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => void dismissPwaInstallPrompt()}
+                  className="press-feedback rounded-full border border-white/[0.08] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-white/72 hover:text-white"
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleInstallAction()}
+                  className="press-feedback rounded-full bg-white px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-black"
+                >
+                  {pwaUpdate.isInstallPromptAvailable ? 'Install App' : 'Install Steps'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {pwaUpdate.needRefresh && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -670,6 +835,109 @@ export default function App() {
                 </button>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {resumeSession && view !== 'timer' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[65] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-6"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="w-full max-w-md rounded-[1.75rem] border border-white/[0.08] bg-black/80 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_64px_rgba(0,0,0,0.7)] backdrop-blur-2xl"
+            >
+              <div className="space-y-2">
+                <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-accent-red">Resume Session</p>
+                <h2 className="text-xl font-semibold tracking-tight text-white">
+                  Continue {resumeSession.recipe.film}
+                </h2>
+                <p className="text-sm leading-relaxed text-white/72">
+                  DarkTimer found an interrupted timer session. Resume where you left off or discard it and start fresh.
+                </p>
+              </div>
+              <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={handleResumeStoredSession}
+                  className="press-feedback flex-1 rounded-full bg-white px-4 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-black"
+                >
+                  Resume Timer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDiscardStoredSession()}
+                  className="press-feedback flex-1 rounded-full border border-white/[0.08] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-white/72 hover:text-white"
+                >
+                  Discard
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showInstallHelp && installInstructions && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[65] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:p-6"
+            onClick={() => setShowInstallHelp(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="flex max-h-[min(78vh,42rem)] w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-black/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_64px_rgba(0,0,0,0.7)] backdrop-blur-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="space-y-2 overflow-y-auto px-6 pt-6 pb-4">
+                <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-accent-red">Install Guide</p>
+                <h2 className="text-xl font-semibold tracking-tight text-white">{installInstructions.title}</h2>
+                {installInstructions.steps ? (
+                  <div className="space-y-3 pt-1">
+                    {installInstructions.steps.map((step, index) => {
+                      const Icon = INSTALL_STEP_ICONS[step.icon];
+                      return (
+                        <div
+                          key={`${step.cue}-${index}`}
+                          className="flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3"
+                        >
+                          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent-red/30 bg-accent-red/10 text-accent-red">
+                            <Icon size={16} />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white">
+                              {index + 1}. {step.cue}
+                            </p>
+                            <p className="text-sm leading-relaxed text-white/72">{step.detail}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : installInstructions.body ? (
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-white/72">{installInstructions.body}</p>
+                ) : null}
+              </div>
+              <div className="flex justify-end border-t border-white/[0.06] px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+                <button
+                  type="button"
+                  onClick={() => setShowInstallHelp(false)}
+                  className="press-feedback rounded-full bg-white px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-black"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

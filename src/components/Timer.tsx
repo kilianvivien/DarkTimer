@@ -3,6 +3,7 @@ import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X, Play, Pau
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
 import {
+  type ActiveTimerSession,
   AgitationMode,
   DevPhase,
   getAgitationDescription,
@@ -11,6 +12,7 @@ import {
   type SessionStatus,
 } from '../services/recipe';
 import { showNotification } from '../services/notifications';
+import { clearStoredActiveTimerSession, saveStoredActiveTimerSession } from '../services/storage';
 import type { UserSettings } from '../services/userSettings';
 
 export interface TimerSessionResult {
@@ -21,8 +23,10 @@ export interface TimerSessionResult {
 }
 
 interface TimerProps {
+  recipeSnapshot: ActiveTimerSession['recipe'];
   phases: DevPhase[];
   compensationAddedSeconds?: number;
+  initialSession?: ActiveTimerSession | null;
   onComplete: () => void;
   onExitSession: () => void;
   onSessionEnd: (result: TimerSessionResult) => Promise<void> | void;
@@ -30,8 +34,10 @@ interface TimerProps {
 }
 
 export const Timer: React.FC<TimerProps> = ({
+  recipeSnapshot,
   phases,
   compensationAddedSeconds = 0,
+  initialSession = null,
   onComplete,
   onExitSession,
   onSessionEnd,
@@ -39,17 +45,21 @@ export const Timer: React.FC<TimerProps> = ({
 }) => {
   const notificationsEnabled = settings.notificationsEnabled;
   const countdownFrom = settings.phaseCountdown;
-  const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(phases[0]?.duration || 0);
-  const [isActive, setIsActive] = useState(false);
+  const initialPhaseIndex = initialSession?.currentPhaseIndex ?? 0;
+  const initialPhase = phases[initialPhaseIndex] ?? phases[0];
+  const [currentPhaseIndex, setCurrentPhaseIndex] = useState(initialPhaseIndex);
+  const [timeLeft, setTimeLeft] = useState(initialSession?.timeLeft ?? initialPhase?.duration ?? 0);
+  const [isActive, setIsActive] = useState(initialSession?.isActive ?? false);
   const [isMuted, setIsMuted] = useState(false);
   const [isAgitating, setIsAgitating] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(initialSession?.countdownRemaining ?? null);
   const [flashVisible, setFlashVisible] = useState(false);
   const [flashKey, setFlashKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImmersiveFallback, setIsImmersiveFallback] = useState(false);
-  const [agitationOverride, setAgitationOverride] = useState<AgitationMode | null>(null);
+  const [agitationOverride, setAgitationOverride] = useState<AgitationMode | null>(
+    initialSession?.agitationOverride ?? null,
+  );
   const isMutedRef = useRef(isMuted);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ownsFullscreenRef = useRef(false);
@@ -57,9 +67,14 @@ export const Timer: React.FC<TimerProps> = ({
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastAgitationCueRef = useRef<string | null>(null);
-  const sessionStartTimeRef = useRef<number | null>(null);
+  const phaseStartedAtRef = useRef<number | null>(initialSession?.phaseStartedAt ?? null);
+  const countdownEndsAtRef = useRef<number | null>(initialSession?.countdownEndsAt ?? null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const lastPersistedSignatureRef = useRef('');
+  const sessionClosedRef = useRef(false);
+  const sessionStartTimeRef = useRef<number | null>(initialSession?.startedAt ?? null);
   const hasProgressRef = useRef(false);
-  const phasesCompletedRef = useRef(0);
+  const phasesCompletedRef = useRef(initialSession?.currentPhaseIndex ?? 0);
   const sessionReportedRef = useRef(false);
 
   const AGITATION_ALERT_SECONDS = 5;
@@ -198,10 +213,65 @@ export const Timer: React.FC<TimerProps> = ({
       return;
     }
 
+    sessionClosedRef.current = false;
     sessionStartTimeRef.current = Date.now();
     hasProgressRef.current = false;
     phasesCompletedRef.current = 0;
     sessionReportedRef.current = false;
+  };
+
+  const syncTimeLeftFromNow = () => {
+    const startedAt = phaseStartedAtRef.current;
+    const current = phases[currentPhaseIndex];
+
+    if (!isActive || !current || startedAt === null) {
+      return;
+    }
+
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+
+    if (elapsedSeconds >= current.duration) {
+      const nextPhaseIndex = currentPhaseIndex + 1;
+      playBeep(880, 0.5);
+
+      if (nextPhaseIndex < phases.length) {
+        const nextPhase = phases[nextPhaseIndex];
+        phasesCompletedRef.current = nextPhaseIndex;
+        if (notificationsEnabled) {
+          showNotification(`${current.name} complete`, `Next: ${nextPhase.name}`);
+        }
+        triggerVibration(120);
+        phaseStartedAtRef.current = null;
+        setCurrentPhaseIndex(nextPhaseIndex);
+        setTimeLeft(nextPhase.duration);
+        setIsActive(false);
+        setCountdown(null);
+        return;
+      }
+
+      phasesCompletedRef.current = phases.length;
+      sessionClosedRef.current = true;
+      if (notificationsEnabled) {
+        showNotification('Development complete', 'All phases finished.');
+      }
+      triggerVibration([160, 120, 220]);
+      phaseStartedAtRef.current = null;
+      setIsActive(false);
+      setCountdown(null);
+      void (async () => {
+        await clearStoredActiveTimerSession();
+        await exitFullscreen();
+        await reportSessionEnd('completed', phases.length);
+        onComplete();
+      })();
+      return;
+    }
+
+    const nextTimeLeft = current.duration - elapsedSeconds;
+    if (nextTimeLeft < current.duration) {
+      hasProgressRef.current = true;
+    }
+    setTimeLeft(nextTimeLeft);
   };
 
   const reportSessionEnd = async (status: SessionStatus, phasesCompleted = phasesCompletedRef.current) => {
@@ -223,19 +293,25 @@ export const Timer: React.FC<TimerProps> = ({
   }, [isMuted]);
 
   useEffect(() => {
-    setCurrentPhaseIndex(0);
-    setTimeLeft(phases[0]?.duration || 0);
-    setIsActive(false);
-    setCountdown(null);
+    const resumePhaseIndex = initialSession?.currentPhaseIndex ?? 0;
+    const resumePhase = phases[resumePhaseIndex] ?? phases[0];
+    setCurrentPhaseIndex(resumePhaseIndex);
+    setTimeLeft(initialSession?.timeLeft ?? resumePhase?.duration ?? 0);
+    setIsActive(initialSession?.isActive ?? false);
+    setCountdown(initialSession?.countdownRemaining ?? null);
     setIsAgitating(false);
     setFlashVisible(false);
     setIsImmersiveFallback(false);
+    setAgitationOverride(initialSession?.agitationOverride ?? null);
     lastAgitationCueRef.current = null;
-    sessionStartTimeRef.current = null;
-    hasProgressRef.current = false;
-    phasesCompletedRef.current = 0;
+    phaseStartedAtRef.current = initialSession?.phaseStartedAt ?? null;
+    countdownEndsAtRef.current = initialSession?.countdownEndsAt ?? null;
+    sessionClosedRef.current = false;
+    sessionStartTimeRef.current = initialSession?.startedAt ?? null;
+    hasProgressRef.current = (initialSession?.currentPhaseIndex ?? 0) > 0;
+    phasesCompletedRef.current = initialSession?.currentPhaseIndex ?? 0;
     sessionReportedRef.current = false;
-  }, [phases]);
+  }, [initialSession, phases]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -262,55 +338,27 @@ export const Timer: React.FC<TimerProps> = ({
       return;
     }
 
-    setTimeLeft(phases[currentPhaseIndex].duration);
+    if (!initialSession || currentPhaseIndex !== initialSession.currentPhaseIndex) {
+      setTimeLeft(phases[currentPhaseIndex].duration);
+      setAgitationOverride(null);
+    }
     setIsAgitating(false);
     setFlashVisible(false);
-    setAgitationOverride(null);
     lastAgitationCueRef.current = null;
-  }, [phases, currentPhaseIndex]);
+  }, [currentPhaseIndex, initialSession, phases]);
 
   useEffect(() => {
     let interval: number | undefined;
 
-    if (isActive && timeLeft > 0) {
+    if (isActive) {
+      syncTimeLeftFromNow();
       interval = window.setInterval(() => {
-        setTimeLeft((prev) => {
-          const next = prev - 1;
-          if (next < phases[currentPhaseIndex].duration) {
-            hasProgressRef.current = true;
-          }
-
-          return next;
-        });
-      }, 1000);
-    } else if (timeLeft === 0 && isActive) {
-      playBeep(880, 0.5); // End of phase beep
-      if (currentPhaseIndex < phases.length - 1) {
-        const nextPhase = phases[currentPhaseIndex + 1];
-        phasesCompletedRef.current = currentPhaseIndex + 1;
-        if (notificationsEnabled) {
-          showNotification(`${phases[currentPhaseIndex].name} complete`, `Next: ${nextPhase.name}`);
-        }
-        triggerVibration(120);
-        setCurrentPhaseIndex((prev) => prev + 1);
-        setIsActive(false);
-      } else {
-        phasesCompletedRef.current = phases.length;
-        if (notificationsEnabled) {
-          showNotification('Development complete', 'All phases finished.');
-        }
-        triggerVibration([160, 120, 220]);
-        setIsActive(false);
-        void (async () => {
-          await exitFullscreen();
-          await reportSessionEnd('completed', phases.length);
-          onComplete();
-        })();
-      }
+        syncTimeLeftFromNow();
+      }, 250);
     }
 
     return () => clearInterval(interval);
-  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, onSessionEnd, phases, timeLeft]);
+  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, phases]);
 
   // Agitation Logic
   useEffect(() => {
@@ -376,31 +424,171 @@ export const Timer: React.FC<TimerProps> = ({
     if (countdown === 0) {
       playTick(880, 0.5);
       setCountdown(null);
+      countdownEndsAtRef.current = null;
       startSession();
+      phaseStartedAtRef.current = Date.now();
       setIsActive(true);
       return;
     }
 
-    playTick(countdown <= 3 ? 660 : 440, 0.08);
-    const t = window.setTimeout(() => setCountdown((c) => (c !== null ? c - 1 : null)), 1000);
-    return () => clearTimeout(t);
+    if (countdownEndsAtRef.current === null) {
+      countdownEndsAtRef.current = Date.now() + countdown * 1000;
+      playTick(countdown <= 3 ? 660 : 440, 0.08);
+    }
+
+    const syncCountdown = () => {
+      const endsAt = countdownEndsAtRef.current;
+      if (endsAt === null) {
+        return;
+      }
+
+      const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+      setCountdown(remaining);
+    };
+
+    const t = window.setInterval(syncCountdown, 250);
+    syncCountdown();
+    return () => clearInterval(t);
   }, [countdown]);
+
+  useEffect(() => {
+    const persistSession = async () => {
+      if (sessionClosedRef.current) {
+        await clearStoredActiveTimerSession();
+        return;
+      }
+
+      const hasStoredState =
+        sessionStartTimeRef.current !== null || countdown !== null || isActive || currentPhaseIndex > 0;
+
+      if (!hasStoredState) {
+        await clearStoredActiveTimerSession();
+        return;
+      }
+
+      const snapshot = {
+        recipe: recipeSnapshot,
+        timerPhases: phases,
+        compensationAddedSeconds,
+        currentPhaseIndex,
+        timeLeft,
+        isActive,
+        countdownRemaining: countdown,
+        countdownEndsAt: countdownEndsAtRef.current,
+        phaseStartedAt: phaseStartedAtRef.current,
+        startedAt: sessionStartTimeRef.current,
+        agitationOverride,
+        updatedAt: Date.now(),
+      } satisfies ActiveTimerSession;
+
+      const signature = JSON.stringify(snapshot);
+      if (signature === lastPersistedSignatureRef.current) {
+        return;
+      }
+
+      lastPersistedSignatureRef.current = signature;
+      await saveStoredActiveTimerSession(snapshot);
+    };
+
+    void persistSession().catch((error) => {
+      console.error('Failed to persist active timer session:', error);
+    });
+  }, [agitationOverride, compensationAddedSeconds, countdown, currentPhaseIndex, isActive, phases, recipeSnapshot, timeLeft]);
+
+  useEffect(() => {
+    const acquireWakeLock = async () => {
+      if (
+        typeof navigator === 'undefined' ||
+        !('wakeLock' in navigator) ||
+        !isActive ||
+        document.visibilityState !== 'visible'
+      ) {
+        return;
+      }
+
+      try {
+        const navigatorWithWakeLock = navigator as Navigator & {
+          wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinel> };
+        };
+        wakeLockRef.current = await navigatorWithWakeLock.wakeLock?.request('screen')!;
+      } catch (error) {
+        console.error('Failed to acquire wake lock:', error);
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      try {
+        await wakeLockRef.current?.release();
+      } catch (error) {
+        console.error('Failed to release wake lock:', error);
+      } finally {
+        wakeLockRef.current = null;
+      }
+    };
+
+    if (isActive) {
+      void acquireWakeLock();
+    } else {
+      void releaseWakeLock();
+    }
+
+    return () => {
+      void releaseWakeLock();
+    };
+  }, [isActive]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      if (countdown !== null && countdownEndsAtRef.current !== null) {
+        const remaining = Math.max(0, Math.ceil((countdownEndsAtRef.current - Date.now()) / 1000));
+        setCountdown(remaining);
+      }
+
+      syncTimeLeftFromNow();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [countdown, currentPhaseIndex, isActive, phases]);
 
   const toggleTimer = () => {
     if (countdown !== null) {
       setCountdown(null); // cancel pre-start countdown
+      countdownEndsAtRef.current = null;
     } else if (!isActive && timeLeft === phases[currentPhaseIndex]?.duration) {
+      sessionClosedRef.current = false;
       primeAudio();
       void requestFullscreen();
       if (countdownFrom > 0) {
         setCountdown(countdownFrom);
+        countdownEndsAtRef.current = Date.now() + countdownFrom * 1000;
       } else {
         startSession();
+        phaseStartedAtRef.current = Date.now();
         setIsActive(true);
       }
     } else {
       primeAudio();
-      setIsActive((v) => !v); // pause / resume
+      setIsActive((value) => {
+        const nextValue = !value;
+        if (nextValue) {
+          sessionClosedRef.current = false;
+          if (sessionStartTimeRef.current === null) {
+            startSession();
+          }
+          phaseStartedAtRef.current = Date.now() - Math.max(0, (phases[currentPhaseIndex].duration - timeLeft) * 1000);
+        } else {
+          syncTimeLeftFromNow();
+          phaseStartedAtRef.current = null;
+        }
+        return nextValue;
+      });
     }
   };
 
@@ -415,6 +603,8 @@ export const Timer: React.FC<TimerProps> = ({
   const resetTimer = () => {
     setIsActive(false);
     setCountdown(null);
+    countdownEndsAtRef.current = null;
+    phaseStartedAtRef.current = null;
     setIsAgitating(false);
     setFlashVisible(false);
     lastAgitationCueRef.current = null;
@@ -425,15 +615,21 @@ export const Timer: React.FC<TimerProps> = ({
       setCurrentPhaseIndex((prev) => prev + 1);
       setIsActive(false);
       setCountdown(null);
+       countdownEndsAtRef.current = null;
+      phaseStartedAtRef.current = null;
       setIsAgitating(false);
     }
   };
 
   const handleExitSession = async () => {
+    sessionClosedRef.current = true;
     setIsActive(false);
     setCountdown(null);
+    countdownEndsAtRef.current = null;
+    phaseStartedAtRef.current = null;
     setIsAgitating(false);
     setFlashVisible(false);
+    await clearStoredActiveTimerSession();
     await exitFullscreen();
     if (sessionStartTimeRef.current !== null) {
       await reportSessionEnd(hasProgressRef.current ? 'partial' : 'aborted');

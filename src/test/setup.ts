@@ -113,12 +113,30 @@ Object.defineProperty(navigator, 'vibrate', {
   value: vi.fn(),
 });
 
+Object.defineProperty(navigator, 'wakeLock', {
+  configurable: true,
+  writable: true,
+  value: {
+    request: vi.fn(async () => ({
+      release: vi.fn(async () => {}),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+      released: false,
+      type: 'screen',
+      onrelease: null,
+    })),
+  },
+});
+
 beforeEach(async () => {
   const storage = await import('../services/storage');
   const secretStorage = await import('../services/secretStorage');
+  const pwa = await import('../services/pwa');
 
   await storage.__resetStorageForTests();
   secretStorage.__resetApiKeyStateForTests();
+  pwa.__resetPwaStateForTests();
   localStorage.clear();
   sessionStorage.clear();
   NotificationMock.permission = 'default';

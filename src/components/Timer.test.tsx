@@ -2,17 +2,57 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Timer } from './Timer';
 import { DEFAULT_SETTINGS } from '../services/userSettings';
+import { clearStoredActiveTimerSession, getStoredActiveTimerSession } from '../services/storage';
+import { flushPromises } from '../test/utils';
 
 const showNotificationMock = vi.fn();
+const storageMocks = vi.hoisted(() => {
+  let activeTimerSession: unknown = null;
+
+  return {
+    saveStoredActiveTimerSession: vi.fn(async (session: unknown) => {
+      activeTimerSession = session;
+      return session;
+    }),
+    clearStoredActiveTimerSession: vi.fn(async () => {
+      activeTimerSession = null;
+    }),
+    getStoredActiveTimerSession: vi.fn(async () => activeTimerSession),
+    reset: () => {
+      activeTimerSession = null;
+    },
+  };
+});
 
 vi.mock('../services/notifications', () => ({
   showNotification: (...args: unknown[]) => showNotificationMock(...args),
 }));
 
+vi.mock('../services/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/storage')>();
+
+  return {
+    ...actual,
+    saveStoredActiveTimerSession: storageMocks.saveStoredActiveTimerSession,
+    clearStoredActiveTimerSession: storageMocks.clearStoredActiveTimerSession,
+    getStoredActiveTimerSession: storageMocks.getStoredActiveTimerSession,
+  };
+});
+
 const phases = [
   { name: 'Developer', duration: 2, agitationMode: 'every-60s' as const, agitation: 'Agitate every 1 minute.' },
   { name: 'Fixer', duration: 1, agitationMode: 'stand' as const, agitation: 'Stand with no agitation cues.' },
 ];
+const recipe = {
+  film: 'HP5',
+  developer: 'ID-11',
+  dilution: '1+1',
+  iso: 400,
+  tempC: 20,
+  processMode: 'bw' as const,
+  phases,
+  notes: '',
+};
 
 function getCurrentTimerDisplay(): HTMLElement {
   return screen.getByText((_content, element) => element?.getAttribute('aria-live') === 'polite');
@@ -21,12 +61,17 @@ function getCurrentTimerDisplay(): HTMLElement {
 describe('Timer', () => {
   beforeEach(() => {
     showNotificationMock.mockReset();
+    storageMocks.reset();
+    storageMocks.saveStoredActiveTimerSession.mockClear();
+    storageMocks.clearStoredActiveTimerSession.mockClear();
+    storageMocks.getStoredActiveTimerSession.mockClear();
     vi.useFakeTimers();
   });
 
   it('enters and cancels the pre-start countdown state', async () => {
     render(
       <Timer
+        recipeSnapshot={recipe}
         phases={phases}
         onComplete={vi.fn()}
         onExitSession={vi.fn()}
@@ -50,6 +95,7 @@ describe('Timer', () => {
 
     render(
       <Timer
+        recipeSnapshot={recipe}
         phases={phases}
         onComplete={onComplete}
         onExitSession={vi.fn()}
@@ -60,7 +106,7 @@ describe('Timer', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1250);
     });
     expect(getCurrentTimerDisplay()).toHaveTextContent('0:01');
 
@@ -70,25 +116,27 @@ describe('Timer', () => {
     });
     expect(getCurrentTimerDisplay()).toHaveTextContent('0:01');
 
-    fireEvent.click(screen.getAllByRole('button')[2]);
+    fireEvent.click(screen.getByRole('button', { name: /reset current phase/i }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(getCurrentTimerDisplay()).toHaveTextContent('0:02');
 
     fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
-    fireEvent.click(screen.getAllByRole('button')[4]);
+    fireEvent.click(screen.getByRole('button', { name: /skip current phase/i }));
     expect(screen.getByText('Phase 2/2')).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1250);
+      await flushPromises();
     });
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onSessionEnd).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'completed', phasesCompleted: 2 }),
     );
+    await expect(getStoredActiveTimerSession()).resolves.toBeNull();
     expect(showNotificationMock).toHaveBeenCalledWith('Development complete', 'All phases finished.');
   });
 
@@ -129,6 +177,7 @@ describe('Timer', () => {
 
       render(
         <Timer
+          recipeSnapshot={recipe}
           phases={phases}
           onComplete={vi.fn()}
           onExitSession={vi.fn()}
@@ -200,6 +249,7 @@ describe('Timer', () => {
 
     render(
       <Timer
+        recipeSnapshot={recipe}
         phases={[{ name: 'Developer', duration: 1, agitationMode: 'stand' as const }]}
         onComplete={vi.fn()}
         onExitSession={vi.fn()}
@@ -208,7 +258,7 @@ describe('Timer', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /mute timer sounds/i }));
     fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
@@ -223,6 +273,7 @@ describe('Timer', () => {
 
     render(
       <Timer
+        recipeSnapshot={recipe}
         phases={[{ name: 'Developer', duration: 3, agitationMode: 'stand' as const }]}
         onComplete={vi.fn()}
         onExitSession={onExitSession}
@@ -247,6 +298,7 @@ describe('Timer', () => {
 
     render(
       <Timer
+        recipeSnapshot={recipe}
         phases={[{ name: 'Developer', duration: 3, agitationMode: 'stand' as const }]}
         onComplete={vi.fn()}
         onExitSession={vi.fn()}
@@ -266,5 +318,73 @@ describe('Timer', () => {
     expect(onSessionEnd).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'partial', phasesCompleted: 0 }),
     );
+  });
+
+  it('persists the active timer session and clears it when exiting', async () => {
+    render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={phases}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    await expect(getStoredActiveTimerSession()).resolves.toMatchObject({
+      recipe: { film: 'HP5' },
+      currentPhaseIndex: 0,
+      isActive: true,
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /exit session/i }));
+    });
+
+    await expect(getStoredActiveTimerSession()).resolves.toBeNull();
+  });
+
+  it('rehydrates an in-progress timer session from stored state', async () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(10_000);
+
+    await clearStoredActiveTimerSession();
+
+    render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={phases}
+        initialSession={{
+          recipe,
+          timerPhases: phases,
+          compensationAddedSeconds: 0,
+          currentPhaseIndex: 0,
+          timeLeft: 2,
+          isActive: true,
+          countdownRemaining: null,
+          countdownEndsAt: null,
+          phaseStartedAt: 9_000,
+          startedAt: 9_000,
+          agitationOverride: null,
+          updatedAt: 10_000,
+        }}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+      />,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(getCurrentTimerDisplay()).toHaveTextContent('0:01');
   });
 });

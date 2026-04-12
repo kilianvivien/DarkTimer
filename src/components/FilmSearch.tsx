@@ -17,6 +17,7 @@ import {
   filterCatalogByProcessMode,
 } from '../services/searchCatalog';
 import { SearchableField } from './SearchableField';
+import { getCachedAiRecipe, saveCachedAiRecipe } from '../services/storage';
 
 interface FilmSearchProps {
   apiKeys: Record<AIProvider, string>;
@@ -66,6 +67,19 @@ function normalizeQuery(query: SearchQuery): SearchQuery {
     developer: query.developer.trim(),
     dilution: query.dilution.trim(),
   };
+}
+
+function buildAiCacheKey(provider: AIProvider, query: SearchQuery): string {
+  const normalized = normalizeQuery(query);
+  return JSON.stringify({
+    provider,
+    film: normalized.film.toLowerCase(),
+    developer: normalized.developer.toLowerCase(),
+    dilution: normalized.dilution.toLowerCase(),
+    iso: normalized.iso,
+    tempC: normalized.tempC,
+    processMode: normalized.processMode,
+  });
 }
 
 function buildSearchError(provider: AIProvider, error: unknown): SearchErrorState {
@@ -286,6 +300,15 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
     }
 
     if (isOffline) {
+      const cached = await getCachedAiRecipe(buildAiCacheKey(nextProvider, normalizedQuery));
+
+      if (cached) {
+        setResults(cached);
+        setResultProvider(nextProvider);
+        setHasSearched(true);
+        return;
+      }
+
       setSearchError(buildSearchError(nextProvider, new AIRecipeError('offline', nextProvider)));
       return;
     }
@@ -317,8 +340,16 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
 
       setResults(response);
       setResultProvider(nextProvider);
+      await saveCachedAiRecipe(buildAiCacheKey(nextProvider, normalizedQuery), response);
     } catch (error) {
       if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
+
+      const fallback = await getCachedAiRecipe(buildAiCacheKey(nextProvider, normalizedQuery));
+      if (fallback && error instanceof AIRecipeError && (error.code === 'network' || error.code === 'offline' || error.code === 'unavailable')) {
+        setResults(fallback);
+        setResultProvider(nextProvider);
         return;
       }
 

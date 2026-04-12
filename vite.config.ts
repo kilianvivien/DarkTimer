@@ -62,11 +62,13 @@ export default defineConfig(() => {
               src: '/pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png',
+              purpose: 'any',
             },
             {
               src: '/pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
+              purpose: 'any',
             },
             {
               src: '/maskable-512x512.png',
@@ -79,6 +81,32 @@ export default defineConfig(() => {
         workbox: {
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/generativelanguage\.googleapis\.com\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'darktimer-gemini-runtime',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
+                },
+                networkTimeoutSeconds: 5,
+              },
+            },
+            {
+              urlPattern: /^https:\/\/api\.mistral\.ai\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'darktimer-mistral-runtime',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
+                },
+                networkTimeoutSeconds: 5,
+              },
+            },
+          ],
         },
       }),
     ],

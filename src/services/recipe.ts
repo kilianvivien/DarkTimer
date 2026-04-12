@@ -32,6 +32,21 @@ export interface Session {
   phasesCompleted: number;
 }
 
+export interface ActiveTimerSession {
+  recipe: DevRecipe;
+  timerPhases: DevPhase[];
+  compensationAddedSeconds: number;
+  currentPhaseIndex: number;
+  timeLeft: number;
+  isActive: boolean;
+  countdownRemaining: number | null;
+  countdownEndsAt: number | null;
+  phaseStartedAt: number | null;
+  startedAt: number | null;
+  agitationOverride: AgitationMode | null;
+  updatedAt: number;
+}
+
 export const DEFAULT_BW_TEMP_C = 20;
 export const DEFAULT_COLOR_TEMP_C = 38;
 
@@ -205,5 +220,53 @@ export function normalizeRecipe(
     phases,
     notes: typeof raw.notes === 'string' ? raw.notes : '',
     source: typeof raw.source === 'string' ? raw.source : undefined,
+  };
+}
+
+export function normalizeActiveTimerSession(session: unknown): ActiveTimerSession | null {
+  if (!isRecord(session)) {
+    return null;
+  }
+
+  const timerPhases = Array.isArray(session.timerPhases) ? session.timerPhases.map(normalizePhase) : [];
+
+  if (timerPhases.length === 0) {
+    return null;
+  }
+
+  const readNumber = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+  const readBoundedIndex = (value: unknown): number => {
+    const parsed = readNumber(value);
+    if (parsed === null) {
+      return 0;
+    }
+
+    return Math.min(timerPhases.length - 1, Math.max(0, Math.round(parsed)));
+  };
+
+  const readAgitation = (value: unknown): AgitationMode | null =>
+    isAgitationMode(value) ? value : null;
+
+  const currentPhaseIndex = readBoundedIndex(session.currentPhaseIndex);
+  const fallbackTimeLeft = timerPhases[currentPhaseIndex]?.duration ?? 0;
+
+  return {
+    recipe: normalizeRecipe(session.recipe),
+    timerPhases,
+    compensationAddedSeconds: Math.max(0, Math.round(readNumber(session.compensationAddedSeconds) ?? 0)),
+    currentPhaseIndex,
+    timeLeft: Math.max(0, Math.round(readNumber(session.timeLeft) ?? fallbackTimeLeft)),
+    isActive: session.isActive === true,
+    countdownRemaining:
+      session.countdownRemaining === null
+        ? null
+        : Math.max(0, Math.round(readNumber(session.countdownRemaining) ?? 0)),
+    countdownEndsAt: readNumber(session.countdownEndsAt),
+    phaseStartedAt: readNumber(session.phaseStartedAt),
+    startedAt: readNumber(session.startedAt),
+    agitationOverride: readAgitation(session.agitationOverride),
+    updatedAt: readNumber(session.updatedAt) ?? Date.now(),
   };
 }

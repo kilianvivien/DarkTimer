@@ -1,6 +1,14 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import { normalizeRecipe, type DevRecipe, type Session, type SessionStatus } from './recipe';
+import {
+  normalizeActiveTimerSession,
+  normalizeRecipe,
+  type ActiveTimerSession,
+  type DevRecipe,
+  type Session,
+  type SessionStatus,
+} from './recipe';
 import type { Preset } from './presetTypes';
+import type { DevResponse } from './aiShared';
 import {
   DEFAULT_SETTINGS,
   normalizeSettings,
@@ -10,16 +18,17 @@ import {
 import type { StoredChem, ChemType, ChemProcessMode } from './chemTypes';
 
 const DB_NAME = 'darktimer-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const SETTINGS_KEY = 'user';
 const ENCRYPTED_API_VAULT_KEY = 'apiKeys';
+const ACTIVE_TIMER_SESSION_KEY = 'active';
 
 const LEGACY_SETTINGS_KEY = 'darktimer_settings';
 const LEGACY_PRESETS_KEY = 'darktimer_presets';
 const LEGACY_GEMINI_KEY = 'darktimer_gemini_key';
 const LEGACY_MISTRAL_KEY = 'darktimer_mistral_key';
 
-type StorageTopic = 'settings' | 'presets' | 'sessions' | 'chems';
+type StorageTopic = 'settings' | 'presets' | 'sessions' | 'chems' | 'activeTimer';
 
 interface SettingsRecord {
   key: typeof SETTINGS_KEY;
@@ -29,6 +38,17 @@ interface SettingsRecord {
 interface ApiKeyRecord {
   provider: AIProvider;
   key: string;
+}
+
+interface ActiveTimerSessionRecord {
+  key: typeof ACTIVE_TIMER_SESSION_KEY;
+  value: ActiveTimerSession;
+}
+
+interface AiRecipeCacheRecord {
+  key: string;
+  response: DevResponse;
+  updatedAt: number;
 }
 
 export interface EncryptedApiKeyVaultRecord {
@@ -79,6 +99,17 @@ interface DarkTimerDB extends DBSchema {
       createdAt: number;
     };
   };
+  activeTimer: {
+    key: string;
+    value: ActiveTimerSessionRecord;
+  };
+  aiRecipeCache: {
+    key: string;
+    value: AiRecipeCacheRecord;
+    indexes: {
+      updatedAt: number;
+    };
+  };
 }
 
 const listeners: Record<StorageTopic, Set<() => void>> = {
@@ -86,6 +117,7 @@ const listeners: Record<StorageTopic, Set<() => void>> = {
   presets: new Set(),
   sessions: new Set(),
   chems: new Set(),
+  activeTimer: new Set(),
 };
 
 let dbPromise: Promise<IDBPDatabase<DarkTimerDB>> | null = null;
@@ -131,6 +163,15 @@ function getDb(): Promise<IDBPDatabase<DarkTimerDB>> {
           chems.createIndex('type', 'type');
           chems.createIndex('processMode', 'processMode');
           chems.createIndex('createdAt', 'createdAt');
+        }
+
+        if (!db.objectStoreNames.contains('activeTimer')) {
+          db.createObjectStore('activeTimer', { keyPath: 'key' });
+        }
+
+        if (!db.objectStoreNames.contains('aiRecipeCache')) {
+          const cache = db.createObjectStore('aiRecipeCache', { keyPath: 'key' });
+          cache.createIndex('updatedAt', 'updatedAt');
         }
       },
     });
@@ -413,6 +454,62 @@ export async function clearStoredSessions(): Promise<void> {
   emit('sessions');
 }
 
+export async function getStoredActiveTimerSession(): Promise<ActiveTimerSession | null> {
+  await initStorage();
+  const db = await getDb();
+  const record = await db.get('activeTimer', ACTIVE_TIMER_SESSION_KEY);
+  return record ? normalizeActiveTimerSession(record.value) : null;
+}
+
+export async function saveStoredActiveTimerSession(
+  session: ActiveTimerSession,
+): Promise<ActiveTimerSession> {
+  const normalized = normalizeActiveTimerSession(session);
+
+  if (!normalized) {
+    throw new Error('Active timer session is invalid.');
+  }
+
+  await initStorage();
+  const db = await getDb();
+  await db.put('activeTimer', { key: ACTIVE_TIMER_SESSION_KEY, value: normalized });
+  emit('activeTimer');
+  return normalized;
+}
+
+export async function clearStoredActiveTimerSession(): Promise<void> {
+  await initStorage();
+  const db = await getDb();
+  await db.delete('activeTimer', ACTIVE_TIMER_SESSION_KEY);
+  emit('activeTimer');
+}
+
+function normalizeDevResponseCache(response: DevResponse): DevResponse {
+  return {
+    confidence: typeof response.confidence === 'string' ? response.confidence : '',
+    options: Array.isArray(response.options)
+      ? response.options.map((option) => normalizeRecipe(option))
+      : [],
+  };
+}
+
+export async function getCachedAiRecipe(key: string): Promise<DevResponse | null> {
+  await initStorage();
+  const db = await getDb();
+  const record = await db.get('aiRecipeCache', key);
+  return record ? normalizeDevResponseCache(record.response) : null;
+}
+
+export async function saveCachedAiRecipe(key: string, response: DevResponse): Promise<void> {
+  await initStorage();
+  const db = await getDb();
+  await db.put('aiRecipeCache', {
+    key,
+    response: normalizeDevResponseCache(response),
+    updatedAt: Date.now(),
+  });
+}
+
 function normalizeChemType(value: unknown): ChemType {
   return value === 'fixer' ? 'fixer' : 'developer';
 }
@@ -516,6 +613,8 @@ export async function clearAllData(): Promise<void> {
     db.clear('settings'),
     db.clear('secureVault'),
     db.clear('apiKeys'),
+    db.clear('activeTimer'),
+    db.clear('aiRecipeCache'),
   ]);
   if (typeof localStorage !== 'undefined') {
     localStorage.clear();
@@ -524,6 +623,7 @@ export async function clearAllData(): Promise<void> {
   emit('sessions');
   emit('chems');
   emit('settings');
+  emit('activeTimer');
 }
 
 export async function __resetStorageForTests(): Promise<void> {
@@ -531,6 +631,7 @@ export async function __resetStorageForTests(): Promise<void> {
   listeners.presets.clear();
   listeners.sessions.clear();
   listeners.chems.clear();
+  listeners.activeTimer.clear();
 
   if (dbPromise) {
     const db = await dbPromise.catch(() => null);

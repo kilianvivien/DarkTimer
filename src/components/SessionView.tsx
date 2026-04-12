@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
-import { DevRecipe, formatTemperature, getProcessLabel, type Session } from '../services/recipe';
+import { DevRecipe, formatTemperature, getProcessLabel, type ActiveTimerSession, type Session } from '../services/recipe';
 import { Timer, type TimerSessionResult } from './Timer';
 import type { UserSettings } from '../services/userSettings';
 import { useStoredChems } from '../hooks/useStoredData';
@@ -9,6 +9,7 @@ import { DeveloperCompensationInput, type CompensationMode } from './DeveloperCo
 
 interface SessionViewProps {
   recipe: DevRecipe | null;
+  initialSession?: ActiveTimerSession | null;
   onExit: () => void;
   onSaveSession: (session: Session) => Promise<void>;
   settings: UserSettings;
@@ -16,6 +17,7 @@ interface SessionViewProps {
 
 export const SessionView: React.FC<SessionViewProps> = ({
   recipe,
+  initialSession = null,
   onExit,
   onSaveSession,
   settings,
@@ -35,7 +37,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
     setCompMode('off');
     setCustomPercent(0);
     setPerRollPercent(2);
-  }, [recipe]);
+  }, [initialSession, recipe]);
 
   if (!recipe) {
     return null;
@@ -57,7 +59,9 @@ export const SessionView: React.FC<SessionViewProps> = ({
     ? Math.round(developerPhase.duration * totalPercent / 100)
     : 0;
 
-  const compensatedPhases = applyDeveloperCompensation(recipe.phases, totalPercent);
+  const compensatedPhases = initialSession?.timerPhases ?? applyDeveloperCompensation(recipe.phases, totalPercent);
+  const effectiveCompensationAddedSeconds = initialSession?.compensationAddedSeconds ?? addedSeconds;
+  const showCompensationControls = !isComplete && developerPhase && !initialSession;
 
   const handleSessionEnd = async (result: TimerSessionResult) => {
     await onSaveSession({
@@ -112,7 +116,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
           )}
 
           {/* Compensation panel — only show before session starts */}
-          {!isComplete && developerPhase && (
+          {showCompensationControls && (
             <div className="pt-3 border-t border-dark-border">
               <DeveloperCompensationInput
                 developerName={recipe.developer}
@@ -166,8 +170,10 @@ export const SessionView: React.FC<SessionViewProps> = ({
         <div className="w-full">
           <Timer
             key={sessionKey}
+            recipeSnapshot={recipe}
             phases={compensatedPhases}
-            compensationAddedSeconds={addedSeconds}
+            compensationAddedSeconds={effectiveCompensationAddedSeconds}
+            initialSession={initialSession}
             onComplete={() => setIsComplete(true)}
             onExitSession={onExit}
             onSessionEnd={handleSessionEnd}

@@ -221,4 +221,67 @@ describe('storage service', () => {
 
     unsubscribe();
   });
+
+  it('persists and clears an active timer session snapshot', async () => {
+    const storage = await loadStorage();
+
+    await storage.saveStoredActiveTimerSession({
+      recipe: {
+        film: 'HP5',
+        developer: 'ID-11',
+        dilution: '1+1',
+        iso: 400,
+        tempC: 20,
+        processMode: 'bw',
+        phases: [],
+        notes: '',
+      },
+      timerPhases: [{ name: 'Developer', duration: 300, agitationMode: 'stand' }],
+      compensationAddedSeconds: 0,
+      currentPhaseIndex: 0,
+      timeLeft: 240,
+      isActive: true,
+      countdownRemaining: null,
+      countdownEndsAt: null,
+      phaseStartedAt: 100,
+      startedAt: 100,
+      agitationOverride: null,
+      updatedAt: 120,
+    });
+
+    await expect(storage.getStoredActiveTimerSession()).resolves.toMatchObject({
+      recipe: { film: 'HP5' },
+      currentPhaseIndex: 0,
+      timeLeft: 240,
+      isActive: true,
+    });
+
+    await storage.clearStoredActiveTimerSession();
+    await expect(storage.getStoredActiveTimerSession()).resolves.toBeNull();
+  });
+
+  it('caches AI recipe lookups for offline fallback', async () => {
+    const storage = await loadStorage();
+
+    await storage.saveCachedAiRecipe('cache-key', {
+      confidence: 'high',
+      options: [
+        {
+          film: 'Tri-X',
+          developer: 'HC-110',
+          dilution: 'B',
+          iso: 400,
+          tempC: 20,
+          processMode: 'bw',
+          phases: [{ name: 'Developer', duration: 390, agitationMode: 'every-60s' }],
+          notes: 'cached',
+        },
+      ],
+    });
+
+    await expect(storage.getCachedAiRecipe('cache-key')).resolves.toMatchObject({
+      confidence: 'high',
+      options: [{ film: 'Tri-X', developer: 'HC-110' }],
+    });
+  });
 });
