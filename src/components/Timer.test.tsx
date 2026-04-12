@@ -247,6 +247,43 @@ describe('Timer', () => {
     expect(screen.getByRole('button', { name: /leave fullscreen/i })).toBeInTheDocument();
   });
 
+  it('treats a compensation-adjusted phase as a fresh start', async () => {
+    const requestFullscreenSpy = vi.spyOn(HTMLElement.prototype, 'requestFullscreen');
+    const { rerender } = render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={phases}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
+
+    rerender(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={[{ ...phases[0], duration: 3 }, phases[1]]}
+        compensationAddedSeconds={1}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={DEFAULT_SETTINGS}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Starting in')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /leave fullscreen/i })).toBeInTheDocument();
+    expect(requestFullscreenSpy).toHaveBeenCalled();
+
+    requestFullscreenSpy.mockRestore();
+  });
+
   it('suppresses audio side effects while muted', async () => {
     const oscillatorStart = vi.fn();
 

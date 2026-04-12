@@ -59,7 +59,10 @@ export const SessionView: React.FC<SessionViewProps> = ({
     ? Math.round(developerPhase.duration * totalPercent / 100)
     : 0;
 
-  const compensatedPhases = initialSession?.timerPhases ?? applyDeveloperCompensation(recipe.phases, totalPercent);
+  const compensatedPhases = React.useMemo(
+    () => initialSession?.timerPhases ?? applyDeveloperCompensation(recipe.phases, totalPercent),
+    [initialSession?.timerPhases, recipe.phases, totalPercent],
+  );
   const effectiveCompensationAddedSeconds = initialSession?.compensationAddedSeconds ?? addedSeconds;
   const showCompensationControls = !isComplete && developerPhase && !initialSession;
 

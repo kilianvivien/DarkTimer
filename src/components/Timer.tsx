@@ -247,6 +247,13 @@ export const Timer: React.FC<TimerProps> = ({
     void requestFullscreen();
   };
 
+  const isFreshSessionStart = () =>
+    !isActive &&
+    countdown === null &&
+    phaseStartedAtRef.current === null &&
+    sessionStartTimeRef.current === null &&
+    !hasProgressRef.current;
+
   const playBeep = (freq: number, duration: number) => {
     if (isMutedRef.current) return;
     const ctx = getAudioContext();
@@ -629,7 +636,7 @@ export const Timer: React.FC<TimerProps> = ({
     if (countdown !== null) {
       setCountdown(null); // cancel pre-start countdown
       countdownEndsAtRef.current = null;
-    } else if (!isActive && timeLeft === phases[currentPhaseIndex]?.duration) {
+    } else if (isFreshSessionStart()) {
       sessionClosedRef.current = false;
       primeAudio();
       void requestFullscreen();
