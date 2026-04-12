@@ -496,6 +496,13 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
               </button>
             ))}
           </div>
+
+          <PreferenceToggle
+            checked={settings.yoloRun}
+            label="Yolo run"
+            description="Automatically move into the next phase without needing a manual Start press. If a phase countdown is set, it still runs before each auto-started phase."
+            onToggle={() => handleChange('yoloRun', !settings.yoloRun)}
+          />
         </div>
       </div>
 

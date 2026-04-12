@@ -14,6 +14,7 @@ describe('userSettings helpers', () => {
       aiProvider: 'mistral',
       apiKeyPersistenceMode: 'encrypted',
       phaseCountdown: 5,
+      yoloRun: true,
       agitationFlashEnabled: false,
       agitationVibrationEnabled: true,
     });
@@ -24,6 +25,7 @@ describe('userSettings helpers', () => {
       aiProvider: 'mistral',
       apiKeyPersistenceMode: 'encrypted',
       phaseCountdown: 5,
+      yoloRun: true,
       agitationFlashEnabled: false,
       agitationVibrationEnabled: true,
     });
@@ -35,6 +37,7 @@ describe('userSettings helpers', () => {
     expect(
       normalizeSettings({
         phaseCountdown: 123,
+        yoloRun: 'wrong',
         agitationFlashEnabled: 'wrong',
         agitationVibrationEnabled: 'wrong',
       }),

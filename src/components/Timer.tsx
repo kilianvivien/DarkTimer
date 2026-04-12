@@ -83,6 +83,7 @@ export const Timer: React.FC<TimerProps> = ({
 }) => {
   const notificationsEnabled = settings.notificationsEnabled;
   const countdownFrom = settings.phaseCountdown;
+  const yoloRunEnabled = settings.yoloRun;
   const initialPhaseIndex = initialSession?.currentPhaseIndex ?? 0;
   const initialPhase = phases[initialPhaseIndex] ?? phases[0];
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(initialPhaseIndex);
@@ -114,6 +115,7 @@ export const Timer: React.FC<TimerProps> = ({
   const hasProgressRef = useRef(false);
   const phasesCompletedRef = useRef(initialSession?.currentPhaseIndex ?? 0);
   const sessionReportedRef = useRef(false);
+  const lastCountdownCueRef = useRef<number | null>(null);
 
   const AGITATION_ALERT_SECONDS = 5;
   const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator;
@@ -254,6 +256,18 @@ export const Timer: React.FC<TimerProps> = ({
     sessionStartTimeRef.current === null &&
     !hasProgressRef.current;
 
+  const isFreshPhaseStart = () => {
+    const currentPhase = phases[currentPhaseIndex];
+
+    return (
+      !isActive &&
+      countdown === null &&
+      phaseStartedAtRef.current === null &&
+      currentPhase !== undefined &&
+      timeLeft === currentPhase.duration
+    );
+  };
+
   const playBeep = (freq: number, duration: number) => {
     if (isMutedRef.current) return;
     const ctx = getAudioContext();
@@ -295,6 +309,21 @@ export const Timer: React.FC<TimerProps> = ({
     sessionReportedRef.current = false;
   };
 
+  const queuePhaseStart = () => {
+    sessionClosedRef.current = false;
+
+    if (countdownFrom > 0) {
+      setCountdown(countdownFrom);
+      countdownEndsAtRef.current = Date.now() + countdownFrom * 1000;
+      return;
+    }
+
+    setCountdown(null);
+    countdownEndsAtRef.current = null;
+    phaseStartedAtRef.current = Date.now();
+    setIsActive(true);
+  };
+
   const syncTimeLeftFromNow = () => {
     const startedAt = phaseStartedAtRef.current;
     const current = phases[currentPhaseIndex];
@@ -321,6 +350,10 @@ export const Timer: React.FC<TimerProps> = ({
         setTimeLeft(nextPhase.duration);
         setIsActive(false);
         setCountdown(null);
+        countdownEndsAtRef.current = null;
+        if (yoloRunEnabled) {
+          queuePhaseStart();
+        }
         return;
       }
 
@@ -379,6 +412,7 @@ export const Timer: React.FC<TimerProps> = ({
     setIsImmersiveFallback(false);
     setAgitationOverride(initialSession?.agitationOverride ?? null);
     lastAgitationCueRef.current = null;
+    lastCountdownCueRef.current = null;
     phaseStartedAtRef.current = initialSession?.phaseStartedAt ?? null;
     countdownEndsAtRef.current = initialSession?.countdownEndsAt ?? null;
     sessionClosedRef.current = false;
@@ -433,7 +467,7 @@ export const Timer: React.FC<TimerProps> = ({
     }
 
     return () => clearInterval(interval);
-  }, [currentPhaseIndex, isActive, notificationsEnabled, onComplete, phases]);
+  }, [countdownFrom, currentPhaseIndex, isActive, notificationsEnabled, onComplete, phases, yoloRunEnabled]);
 
   // Agitation Logic
   useEffect(() => {
@@ -476,7 +510,10 @@ export const Timer: React.FC<TimerProps> = ({
 
   // Pre-start countdown
   useEffect(() => {
-    if (countdown === null) return;
+    if (countdown === null) {
+      lastCountdownCueRef.current = null;
+      return;
+    }
 
     const playTick = (freq: number, dur: number) => {
       if (isMutedRef.current) return;
@@ -496,8 +533,12 @@ export const Timer: React.FC<TimerProps> = ({
       osc.stop(ctx.currentTime + dur);
     };
 
+    if (lastCountdownCueRef.current !== countdown) {
+      playTick(countdown === 0 ? 880 : countdown <= 3 ? 660 : 440, countdown === 0 ? 0.5 : 0.08);
+      lastCountdownCueRef.current = countdown;
+    }
+
     if (countdown === 0) {
-      playTick(880, 0.5);
       setCountdown(null);
       countdownEndsAtRef.current = null;
       startSession();
@@ -508,7 +549,6 @@ export const Timer: React.FC<TimerProps> = ({
 
     if (countdownEndsAtRef.current === null) {
       countdownEndsAtRef.current = Date.now() + countdown * 1000;
-      playTick(countdown <= 3 ? 660 : 440, 0.08);
     }
 
     const syncCountdown = () => {
@@ -637,17 +677,13 @@ export const Timer: React.FC<TimerProps> = ({
       setCountdown(null); // cancel pre-start countdown
       countdownEndsAtRef.current = null;
     } else if (isFreshSessionStart()) {
-      sessionClosedRef.current = false;
       primeAudio();
       void requestFullscreen();
-      if (countdownFrom > 0) {
-        setCountdown(countdownFrom);
-        countdownEndsAtRef.current = Date.now() + countdownFrom * 1000;
-      } else {
-        startSession();
-        phaseStartedAtRef.current = Date.now();
-        setIsActive(true);
-      }
+      startSession();
+      queuePhaseStart();
+    } else if (isFreshPhaseStart()) {
+      primeAudio();
+      queuePhaseStart();
     } else {
       primeAudio();
       setIsActive((value) => {
@@ -876,7 +912,7 @@ export const Timer: React.FC<TimerProps> = ({
             </p>
           )}
 
-          <div className="w-full h-px bg-dark-border relative overflow-hidden">
+          <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-dark-border">
             <motion.div
               className={cn("absolute top-0 left-0 h-full", isAgitating ? "bg-white" : "bg-accent-red")}
               animate={{ width: countdown !== null ? '100%' : `${progress}%` }}

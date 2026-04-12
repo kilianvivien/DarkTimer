@@ -19,6 +19,7 @@ export interface UserSettings {
   aiProvider: AIProvider;
   apiKeyPersistenceMode: ApiKeyPersistenceMode;
   phaseCountdown: PhaseCountdown;
+  yoloRun: boolean;
   agitationFlashEnabled: boolean;
   agitationVibrationEnabled: boolean;
   autoTrackChemRolls: boolean;
@@ -41,6 +42,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   aiProvider: 'gemini',
   apiKeyPersistenceMode: 'session',
   phaseCountdown: 10,
+  yoloRun: false,
   agitationFlashEnabled: true,
   agitationVibrationEnabled: false,
   autoTrackChemRolls: false,
@@ -84,6 +86,10 @@ export function normalizeSettings(value: unknown): UserSettings {
     phaseCountdown: ([0, 5, 10] as PhaseCountdown[]).includes(parsed.phaseCountdown as PhaseCountdown)
       ? (parsed.phaseCountdown as PhaseCountdown)
       : DEFAULT_SETTINGS.phaseCountdown,
+    yoloRun:
+      typeof parsed.yoloRun === 'boolean'
+        ? parsed.yoloRun
+        : DEFAULT_SETTINGS.yoloRun,
     agitationFlashEnabled:
       typeof parsed.agitationFlashEnabled === 'boolean'
         ? parsed.agitationFlashEnabled

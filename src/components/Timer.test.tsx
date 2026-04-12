@@ -89,6 +89,62 @@ describe('Timer', () => {
     expect(screen.getAllByRole('button', { name: /start/i })).not.toHaveLength(0);
   });
 
+  it('plays countdown beep cues during the pre-start delay', async () => {
+    const oscillatorStart = vi.fn();
+
+    class TestAudioContext {
+      state: AudioContextState = 'running';
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(async () => {});
+      createOscillator() {
+        return {
+          type: 'square',
+          frequency: { setValueAtTime: vi.fn() },
+          connect: vi.fn(),
+          start: oscillatorStart,
+          stop: vi.fn(),
+        };
+      }
+      createGain() {
+        return {
+          gain: {
+            setValueAtTime: vi.fn(),
+            exponentialRampToValueAtTime: vi.fn(),
+          },
+          connect: vi.fn(),
+        };
+      }
+    }
+
+    Object.defineProperty(window, 'AudioContext', {
+      configurable: true,
+      value: TestAudioContext,
+    });
+
+    render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={phases}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 5 }}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+    expect(oscillatorStart).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      for (let step = 0; step < 5; step += 1) {
+        await vi.advanceTimersByTimeAsync(1_000);
+      }
+    });
+
+    expect(oscillatorStart).toHaveBeenCalledTimes(2);
+  });
+
   it('supports pause, reset, skip, and completion callbacks', async () => {
     const onComplete = vi.fn();
     const onSessionEnd = vi.fn();
@@ -138,6 +194,74 @@ describe('Timer', () => {
     );
     await expect(getStoredActiveTimerSession()).resolves.toBeNull();
     expect(showNotificationMock).toHaveBeenCalledWith('Development complete', 'All phases finished.');
+  });
+
+  it('applies the pre-start countdown to a fresh later phase in an active run', async () => {
+    render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={phases}
+        initialSession={{
+          recipe,
+          timerPhases: phases,
+          compensationAddedSeconds: 0,
+          currentPhaseIndex: 1,
+          timeLeft: 1,
+          isActive: false,
+          countdownRemaining: null,
+          countdownEndsAt: null,
+          phaseStartedAt: null,
+          startedAt: 1_000,
+          agitationOverride: null,
+          updatedAt: 1_000,
+        }}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 5 }}
+      />,
+    );
+
+    expect(screen.getByText('Phase 2/2')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+    expect(screen.getByText('Starting in')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+  });
+
+  it('auto-starts the next phase when yolo run is enabled', async () => {
+    render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={phases}
+        initialSession={{
+          recipe,
+          timerPhases: phases,
+          compensationAddedSeconds: 0,
+          currentPhaseIndex: 0,
+          timeLeft: 1,
+          isActive: true,
+          countdownRemaining: null,
+          countdownEndsAt: null,
+          phaseStartedAt: 0,
+          startedAt: 0,
+          agitationOverride: null,
+          updatedAt: 0,
+        }}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 5, yoloRun: true }}
+      />,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_100);
+    });
+
+    expect(screen.getByText('Starting in')).toBeInTheDocument();
+    expect(screen.getByText('Fixer')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: /start/i })).toHaveLength(0);
   });
 
   it('falls back to immersive mode on narrow PWAs when native fullscreen is unavailable', async () => {

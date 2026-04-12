@@ -122,6 +122,7 @@ describe('SettingsMenu', () => {
     expect(screen.getByRole('button', { name: /black & white/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: /color negative & slide/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('switch', { name: /enable notifications/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /yolo run/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /flash overlay/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /vibration cues/i })).toBeInTheDocument();
   });
@@ -157,6 +158,22 @@ describe('SettingsMenu', () => {
 
     expect(onSettingsChange).toHaveBeenCalledWith(
       expect.objectContaining({ phaseCountdown: 0 }),
+    );
+  });
+
+  it('toggles yolo run off by default and saves the new value immediately', async () => {
+    const user = userEvent.setup();
+    const onSettingsChange = vi.fn().mockResolvedValue(undefined);
+
+    renderSettingsMenu({ onSettingsChange });
+
+    const yoloRunToggle = screen.getByRole('switch', { name: /yolo run/i });
+    expect(yoloRunToggle).toHaveAttribute('aria-checked', 'false');
+
+    await user.click(yoloRunToggle);
+
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({ yoloRun: true }),
     );
   });
 });
