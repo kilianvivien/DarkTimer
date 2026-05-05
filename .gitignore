@@ -12,3 +12,6 @@ src-tauri/target/
 
 # Docs (internal planning)
 docs/
+
+# Local agent instructions
+agents.md
