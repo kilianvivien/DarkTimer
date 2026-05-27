@@ -3,8 +3,8 @@ import { AIRecipeError, toAIRecipeError } from './aiErrors';
 import type { ProcessMode } from './recipe';
 import { DevResponse, buildRecipeLookupPrompt, parseJsonResponse } from './aiShared';
 
-const GEMINI_PRIMARY_MODEL = 'gemini-3-flash-preview';
-const GEMINI_FALLBACK_MODELS = ['gemini-3.1-flash-lite-preview'] as const;
+const GEMINI_PRIMARY_MODEL = 'gemini-3.5-flash';
+const GEMINI_FALLBACK_MODELS = ['gemini-3.1-flash-lite'] as const;
 const MAX_UNAVAILABLE_RETRIES = 2;
 
 function getClient(apiKey: string): GoogleGenAI {
