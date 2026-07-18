@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { findDevChartRecipes } from './devChart';
+import { BW_DEV_CHART, findDevChartRecipes } from './devChart';
+import { FILM_STOCK_OPTIONS } from './searchCatalog';
 import { DEFAULT_SETTINGS } from './userSettings';
 
 describe('devChart', () => {
@@ -69,6 +70,32 @@ describe('devChart', () => {
 
     const [p3200] = findDevChartRecipes('T-Max P3200', 'D-76', 'Stock', 3200, 'bw', DEFAULT_SETTINGS);
     expect(p3200.phases[0].duration).toBe(840);
+  });
+
+  it('has an XTOL starting point for every selectable B&W film', () => {
+    const bwFilms = FILM_STOCK_OPTIONS.filter((film) => film.processModes?.includes('bw'));
+
+    expect(bwFilms).toHaveLength(31);
+    for (const film of bwFilms) {
+      expect(
+        BW_DEV_CHART.some((entry) => entry.film === film.value && entry.developer === 'XTOL'),
+        `missing XTOL entry for ${film.value}`,
+      ).toBe(true);
+    }
+  });
+
+  it('returns the offline XTOL recipe for a previously unsupported stock', () => {
+    const [recipe] = findDevChartRecipes(
+      'JCH StreetPan 400',
+      'XTOL',
+      'Stock',
+      400,
+      'bw',
+      DEFAULT_SETTINGS,
+    );
+
+    expect(recipe.phases[0].duration).toBe(765);
+    expect(recipe.notes).not.toMatch(/rough estimate/i);
   });
 
   it('matches film aliases like CineStill BwXX for Double-X entries', () => {
