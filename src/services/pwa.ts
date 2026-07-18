@@ -52,10 +52,6 @@ function emit(): void {
   listeners.forEach((listener) => listener());
 }
 
-function isTauriWindow(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window;
-}
-
 export function isStandaloneDisplay(): boolean {
   if (typeof window === 'undefined') {
     return false;
@@ -119,7 +115,7 @@ function writeInstallDismissed(value: boolean): void {
 }
 
 function computeState(): Partial<PwaUpdateState> {
-  if (typeof window === 'undefined' || isTauriWindow()) {
+  if (typeof window === 'undefined') {
     return {
       isOnline: true,
       isStandalone: false,

@@ -5,7 +5,6 @@ import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const tauriDevHost = process.env.TAURI_DEV_HOST;
   const contentSecurityPolicy = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -117,19 +116,13 @@ export default defineConfig(() => {
     server: {
       port: 3000,
       strictPort: true,
-      host: tauriDevHost || '0.0.0.0',
-      hmr: process.env.DISABLE_HMR === 'true'
-        ? false
-        : tauriDevHost
-          ? { protocol: 'ws', host: tauriDevHost, port: 1421 }
-          : true,
-      watch: { ignored: ['**/src-tauri/**'] },
+      host: '0.0.0.0',
+      hmr: process.env.DISABLE_HMR === 'true' ? false : true,
     },
-    envPrefix: ['VITE_', 'TAURI_ENV_*'],
     build: {
-      target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
-      minify: (!process.env.TAURI_ENV_DEBUG ? 'esbuild' : false) as 'esbuild' | false,
-      sourcemap: !!process.env.TAURI_ENV_DEBUG,
+      target: 'safari13',
+      minify: 'esbuild',
+      sourcemap: false,
     },
     test: {
       environment: 'jsdom',

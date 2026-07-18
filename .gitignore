@@ -7,9 +7,6 @@ coverage/
 .env*
 !.env.example
 
-# Tauri / Rust
-src-tauri/target/
-
 # Docs (internal planning)
 docs/
 

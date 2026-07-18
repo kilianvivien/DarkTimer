@@ -15,44 +15,6 @@ import { showNotification } from '../services/notifications';
 import { clearStoredActiveTimerSession, saveStoredActiveTimerSession } from '../services/storage';
 import type { UserSettings } from '../services/userSettings';
 
-type TauriWindowHandle = {
-  isFullscreen: () => Promise<boolean>;
-  setFullscreen: (fullscreen: boolean) => Promise<void>;
-};
-
-let tauriWindowHandlePromise: Promise<TauriWindowHandle | null> | null = null;
-
-const isTauriRuntime = () => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const tauriWindow = window as Window & {
-    __TAURI_INTERNALS__?: unknown;
-    isTauri?: boolean;
-  };
-
-  return Boolean(tauriWindow.__TAURI_INTERNALS__ || tauriWindow.isTauri);
-};
-
-const getTauriWindowHandle = async (): Promise<TauriWindowHandle | null> => {
-  if (!isTauriRuntime()) {
-    return null;
-  }
-
-  if (!tauriWindowHandlePromise) {
-    tauriWindowHandlePromise = import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) => getCurrentWindow())
-      .catch((error) => {
-        console.error('Failed to load Tauri window API:', error);
-        tauriWindowHandlePromise = null;
-        return null;
-      });
-  }
-
-  return tauriWindowHandlePromise;
-};
-
 export interface TimerSessionResult {
   startTime: number;
   endTime: number;
@@ -186,13 +148,6 @@ export const Timer: React.FC<TimerProps> = ({
       if (typeof document !== 'undefined' && document.exitFullscreen && document.fullscreenElement) {
         await document.exitFullscreen();
         setIsFullscreen(false);
-        return;
-      }
-
-      const tauriWindow = await getTauriWindowHandle();
-      if (tauriWindow && (await tauriWindow.isFullscreen())) {
-        await tauriWindow.setFullscreen(false);
-        setIsFullscreen(false);
       }
     } catch (error) {
       console.error('Failed to exit fullscreen:', error);
@@ -218,19 +173,6 @@ export const Timer: React.FC<TimerProps> = ({
       ownsFullscreenRef.current = true;
       setIsImmersiveFallback(false);
     } catch (error) {
-      const tauriWindow = await getTauriWindowHandle();
-      if (tauriWindow) {
-        try {
-          await tauriWindow.setFullscreen(true);
-          ownsFullscreenRef.current = true;
-          setIsFullscreen(true);
-          setIsImmersiveFallback(false);
-          return;
-        } catch (tauriError) {
-          console.error('Failed to enter native fullscreen:', tauriError);
-        }
-      }
-
       if (canUseImmersiveFallback()) {
         setIsImmersiveFallback(true);
         return;

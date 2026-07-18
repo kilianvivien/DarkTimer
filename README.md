@@ -20,7 +20,7 @@ Guided multi-phase countdown with:
 - **Yolo Run** — auto-advances to the next phase without any manual tap, for hands-off workflows
 - **Developer reuse compensation** — adds extra development time based on a fixed percentage (custom or auto-calculated from your Chems log)
 - **Web Notifications** — optional browser notifications for agitation and phase-end events
-- **Fullscreen / immersive mode** — Web Fullscreen API on desktop, immersive fallback on mobile, native window fullscreen in the Tauri desktop app
+- **Fullscreen / immersive mode** — Web Fullscreen API where supported, immersive fallback on mobile
 - **Wake lock** — keeps the screen on during an active session
 - **Session resumption** — interrupted sessions are saved and can be picked up exactly where you left off
 - Controls: Start / Pause, Reset phase, Skip phase, Mute audio
@@ -60,7 +60,7 @@ Log your developer and fixer batches with mix date, expiration date, max rolls, 
 
 ## Stack
 
-React 19 · Vite 6 · TypeScript · Tailwind CSS v4 · Framer Motion · Tauri v2
+React 19 · Vite 6 · TypeScript · Tailwind CSS v4 · Framer Motion · PWA
 
 ---
 
@@ -75,18 +75,9 @@ npm run dev
 
 Open [localhost:3000](http://localhost:3000), go to **Settings**, choose your preferred AI provider, and paste your API key to enable the AI Assistant. No `.env` file needed — keys are stored in your browser.
 
-### Desktop app (Tauri)
-
-**Additional prerequisite:** [Rust](https://rustup.rs)
-
-```bash
-npm run tauri:dev      # development
-npm run tauri:build    # package for distribution
-```
-
 ### PWA
 
-DarkTimer can be installed as a Progressive Web App on iOS Safari, Android Chrome, and desktop Chrome. An install prompt appears automatically on supported platforms.
+DarkTimer is a Progressive Web App, designed for phones and tablets. It can be installed on iOS Safari, Android Chrome, and desktop Chrome. An install prompt appears automatically on supported platforms.
 
 ---
 
