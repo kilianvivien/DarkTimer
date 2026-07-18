@@ -131,6 +131,28 @@ describe('devChart', () => {
     expect(delta100.source).toMatch(/Delta 100 technical datasheet/i);
   });
 
+  it('keeps explicit manufacturer attribution on most offline rows', () => {
+    const attributedEntries = BW_DEV_CHART.filter((entry) => entry.source);
+
+    expect(attributedEntries).toHaveLength(127);
+    expect(attributedEntries.every((entry) => /ILFORD|HARMAN|KODAK|FOMA/.test(entry.source ?? ''))).toBe(true);
+  });
+
+  it('uses the current Kodak small-tank bulletin values', () => {
+    const [triX] = findDevChartRecipes('Tri-X 400', 'HC-110', '1+31', 400, 'bw', DEFAULT_SETTINGS);
+    const [tMax100] = findDevChartRecipes('T-Max 100', 'XTOL', 'Stock', 100, 'bw', DEFAULT_SETTINGS);
+    const [tMax400] = findDevChartRecipes('T-Max 400', 'D-76', 'Stock', 400, 'bw', DEFAULT_SETTINGS);
+
+    expect(triX.phases[0].duration).toBe(360);
+    expect(tMax100.phases[0].duration).toBe(450);
+    expect(tMax400.phases[0].duration).toBe(450);
+    expect([triX.source, tMax100.source, tMax400.source]).toEqual([
+      'KODAK Processing Black-and-White Films bulletin (March 2023)',
+      'KODAK Processing Black-and-White Films bulletin (March 2023)',
+      'KODAK Processing Black-and-White Films bulletin (March 2023)',
+    ]);
+  });
+
   it('returns the offline XTOL recipe for a previously unsupported stock', () => {
     const [recipe] = findDevChartRecipes(
       'JCH StreetPan 400',
