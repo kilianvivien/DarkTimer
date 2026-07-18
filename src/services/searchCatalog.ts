@@ -19,6 +19,7 @@ export const FILM_STOCK_OPTIONS: SearchableOption[] = [
   { value: 'Delta 3200', label: 'Delta 3200', keywords: ['ilford'], processModes: ['bw'], iso: 3200 },
   { value: 'Pan F Plus', label: 'Pan F Plus', keywords: ['panf', 'pan f', 'ilford'], processModes: ['bw'], iso: 50 },
   { value: 'Kentmere 100', label: 'Kentmere 100', keywords: ['kentmere', 'ilford'], processModes: ['bw'], iso: 100 },
+  { value: 'Kentmere 200', label: 'Kentmere 200', keywords: ['kentmere', 'harman', 'ilford'], processModes: ['bw'], iso: 200 },
   { value: 'Kentmere 400', label: 'Kentmere 400', keywords: ['kentmere', 'ilford'], processModes: ['bw'], iso: 400 },
   { value: 'SFX 200', label: 'SFX 200', keywords: ['sfx', 'infrared', 'ilford'], processModes: ['bw'], iso: 200 },
   { value: 'Ortho Plus', label: 'Ortho Plus', keywords: ['ortho', 'ilford'], processModes: ['bw'], iso: 80 },

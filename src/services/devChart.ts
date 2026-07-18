@@ -25,10 +25,18 @@ export interface DevChartEntry {
   tempC: number;
   agitationMode: 'every-60s' | 'every-30s' | 'stand';
   note?: string;
+  /** Manufacturer document used for this entry. */
+  source?: string;
 }
 
 const CHART_SOURCE = 'Built-in chart (manufacturer starting point)';
 const VERIFY_NOTE = 'Offline starting point — verify against the current datasheet for your batch.';
+const HP5_SOURCE = 'ILFORD HP5 Plus technical datasheet (November 2018)';
+const FP4_SOURCE = 'ILFORD FP4 Plus technical datasheet (November 2018)';
+const DELTA_100_SOURCE = 'ILFORD Delta 100 technical datasheet (April 2023)';
+const KENTMERE_100_SOURCE = 'HARMAN Kentmere Pan 100 technical datasheet';
+const KENTMERE_200_SOURCE = 'HARMAN Kentmere Pan 200 datasheet (March 2025)';
+const KENTMERE_400_SOURCE = 'HARMAN Kentmere Pan 400 technical datasheet (July 2022)';
 
 // Generic compensation factors for off-chart temperatures and pushed/pulled
 // ratings. Temperature scaling follows a Q10-style curve sitting between the
@@ -65,23 +73,63 @@ const FILM_ALIASES: string[][] = [
 
 export const BW_DEV_CHART: DevChartEntry[] = [
   // Ilford HP5 Plus (ISO 400)
-  { film: 'HP5 Plus', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 450, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'HP5 Plus', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 780, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'HP5 Plus', developer: 'DD-X', dilution: '1+4', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'HP5 Plus', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'HP5 Plus', developer: 'Ilfosol 3', dilution: '1+9', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'HP5 Plus', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 360, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'HP5 Plus', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 660, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'HP5 Plus', developer: 'DD-X', dilution: '1+4', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Ilfosol 3', dilution: '1+9', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 400, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Ilfotec HC', dilution: '1+15', iso: 400, devSeconds: 210, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Ilfotec HC', dilution: '1+31', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'LC29', dilution: '1+9', iso: 400, devSeconds: 210, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'LC29', dilution: '1+19', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'LC29', dilution: '1+29', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 780, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'ID-11', dilution: '1+3', iso: 400, devSeconds: 1200, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Microphen', dilution: 'Stock', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Microphen', dilution: '1+1', iso: 400, devSeconds: 720, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Microphen', dilution: '1+3', iso: 400, devSeconds: 1380, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
+  { film: 'HP5 Plus', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: HP5_SOURCE },
   // Ilford FP4 Plus (ISO 125)
-  { film: 'FP4 Plus', developer: 'ID-11', dilution: 'Stock', iso: 125, devSeconds: 390, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'FP4 Plus', developer: 'ID-11', dilution: '1+1', iso: 125, devSeconds: 660, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'FP4 Plus', developer: 'DD-X', dilution: '1+4', iso: 125, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'FP4 Plus', developer: 'XTOL', dilution: 'Stock', iso: 125, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'FP4 Plus', developer: 'Rodinal', dilution: '1+50', iso: 125, devSeconds: 900, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'FP4 Plus', developer: 'DD-X', dilution: '1+4', iso: 125, devSeconds: 600, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Ilfosol 3', dilution: '1+9', iso: 125, devSeconds: 255, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 125, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Ilfotec HC', dilution: '1+15', iso: 125, devSeconds: 240, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Ilfotec HC', dilution: '1+31', iso: 125, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'LC29', dilution: '1+9', iso: 125, devSeconds: 240, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'LC29', dilution: '1+19', iso: 125, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'LC29', dilution: '1+29', iso: 125, devSeconds: 720, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'ID-11', dilution: 'Stock', iso: 125, devSeconds: 510, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'ID-11', dilution: '1+1', iso: 125, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'ID-11', dilution: '1+3', iso: 125, devSeconds: 1200, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Microphen', dilution: 'Stock', iso: 125, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Microphen', dilution: '1+1', iso: 125, devSeconds: 600, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Microphen', dilution: '1+3', iso: 125, devSeconds: 840, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Perceptol', dilution: 'Stock', iso: 125, devSeconds: 720, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Perceptol', dilution: '1+1', iso: 125, devSeconds: 900, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Perceptol', dilution: '1+3', iso: 125, devSeconds: 1260, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Rodinal', dilution: '1+25', iso: 125, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'Rodinal', dilution: '1+50', iso: 125, devSeconds: 900, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
+  { film: 'FP4 Plus', developer: 'XTOL', dilution: 'Stock', iso: 125, devSeconds: 510, tempC: 20, agitationMode: 'every-60s', source: FP4_SOURCE },
   // Ilford Delta 100
-  { film: 'Delta 100', developer: 'ID-11', dilution: 'Stock', iso: 100, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Delta 100', developer: 'DD-X', dilution: '1+4', iso: 100, devSeconds: 720, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Delta 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 450, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Delta 100', developer: 'DD-X', dilution: '1+4', iso: 100, devSeconds: 630, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Ilfosol 3', dilution: '1+9', iso: 100, devSeconds: 300, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Ilfosol 3', dilution: '1+14', iso: 100, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Ilfotec HC', dilution: '1+31', iso: 100, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'LC29', dilution: '1+19', iso: 100, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'LC29', dilution: '1+29', iso: 100, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'ID-11', dilution: 'Stock', iso: 100, devSeconds: 510, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'ID-11', dilution: '1+1', iso: 100, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'ID-11', dilution: '1+3', iso: 100, devSeconds: 1200, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Microphen', dilution: 'Stock', iso: 100, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Microphen', dilution: '1+1', iso: 100, devSeconds: 600, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Microphen', dilution: '1+3', iso: 100, devSeconds: 840, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Perceptol', dilution: 'Stock', iso: 100, devSeconds: 900, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Perceptol', dilution: '1+1', iso: 100, devSeconds: 1020, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Perceptol', dilution: '1+3', iso: 100, devSeconds: 1320, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'Rodinal', dilution: '1+50', iso: 100, devSeconds: 840, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
+  { film: 'Delta 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: DELTA_100_SOURCE },
   // Ilford Delta 400
   { film: 'Delta 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Delta 400', developer: 'DD-X', dilution: '1+4', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
@@ -110,13 +158,55 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   { film: 'Ortho Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 80, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Ortho Plus', developer: 'XTOL', dilution: '1+1', iso: 80, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
   // Kentmere 100 (ISO 100)
-  { film: 'Kentmere 100', developer: 'ID-11', dilution: 'Stock', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Kentmere 100', developer: 'ID-11', dilution: '1+1', iso: 100, devSeconds: 690, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Kentmere 100', developer: 'DD-X', dilution: '1+4', iso: 100, devSeconds: 630, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Ilfosol 3', dilution: '1+9', iso: 100, devSeconds: 300, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Ilfosol 3', dilution: '1+14', iso: 100, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Ilfotec HC', dilution: '1+15', iso: 100, devSeconds: 240, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Ilfotec HC', dilution: '1+31', iso: 100, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'LC29', dilution: '1+9', iso: 100, devSeconds: 240, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'LC29', dilution: '1+19', iso: 100, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'LC29', dilution: '1+29', iso: 100, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'ID-11', dilution: 'Stock', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'ID-11', dilution: '1+1', iso: 100, devSeconds: 690, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'ID-11', dilution: '1+3', iso: 100, devSeconds: 1260, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Microphen', dilution: 'Stock', iso: 100, devSeconds: 510, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Microphen', dilution: '1+1', iso: 100, devSeconds: 630, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Microphen', dilution: '1+3', iso: 100, devSeconds: 870, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Perceptol', dilution: 'Stock', iso: 100, devSeconds: 750, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
+  { film: 'Kentmere 100', developer: 'Perceptol', dilution: '1+1', iso: 100, devSeconds: 930, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
   { film: 'Kentmere 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Kentmere 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
+  // Kentmere Pan 200 (ISO 200). Manufacturer table:
+  // https://www.ilfordphoto.com/kentmere-200-35mm
+  { film: 'Kentmere 200', developer: 'DD-X', dilution: '1+4', iso: 200, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Ilfosol 3', dilution: '1+9', iso: 200, devSeconds: 330, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Ilfosol 3', dilution: '1+14', iso: 200, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Ilfotec HC', dilution: '1+15', iso: 200, devSeconds: 240, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Ilfotec HC', dilution: '1+31', iso: 200, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'LC29', dilution: '1+9', iso: 200, devSeconds: 240, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'LC29', dilution: '1+19', iso: 200, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'LC29', dilution: '1+29', iso: 200, devSeconds: 630, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'ID-11', dilution: 'Stock', iso: 200, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'ID-11', dilution: '1+1', iso: 200, devSeconds: 525, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Microphen', dilution: 'Stock', iso: 200, devSeconds: 330, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Microphen', dilution: '1+1', iso: 200, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Microphen', dilution: '1+3', iso: 200, devSeconds: 585, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Perceptol', dilution: 'Stock', iso: 200, devSeconds: 780, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
+  { film: 'Kentmere 200', developer: 'Perceptol', dilution: '1+1', iso: 200, devSeconds: 960, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_200_SOURCE },
   // Kentmere 400 (ISO 400)
-  { film: 'Kentmere 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 570, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Kentmere 400', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 990, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Kentmere 400', developer: 'DD-X', dilution: '1+4', iso: 400, devSeconds: 690, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'Ilfosol 3', dilution: '1+9', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'Ilfosol 3', dilution: '1+14', iso: 400, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'Ilfotec HC', dilution: '1+15', iso: 400, devSeconds: 270, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'Ilfotec HC', dilution: '1+31', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'LC29', dilution: '1+9', iso: 400, devSeconds: 270, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'LC29', dilution: '1+19', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'LC29', dilution: '1+29', iso: 400, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 570, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 990, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'ID-11', dilution: '1+3', iso: 400, devSeconds: 1530, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'Microphen', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
+  { film: 'Kentmere 400', developer: 'Microphen', dilution: '1+1', iso: 400, devSeconds: 900, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
   { film: 'Kentmere 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 450, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Kentmere 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1050, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Kentmere 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
@@ -313,7 +403,7 @@ function buildBwRecipe(
     processMode: 'bw',
     phases,
     notes: [entry.note, adjustment?.estimateNote, VERIFY_NOTE].filter(Boolean).join(' '),
-    source: CHART_SOURCE,
+    source: entry.source ?? CHART_SOURCE,
   };
 }
 

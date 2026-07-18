@@ -72,16 +72,63 @@ describe('devChart', () => {
     expect(p3200.phases[0].duration).toBe(840);
   });
 
-  it('has an XTOL starting point for every selectable B&W film', () => {
+  it('has a manufacturer starting point for every selectable B&W film', () => {
     const bwFilms = FILM_STOCK_OPTIONS.filter((film) => film.processModes?.includes('bw'));
 
-    expect(bwFilms).toHaveLength(31);
+    expect(bwFilms).toHaveLength(32);
     for (const film of bwFilms) {
       expect(
-        BW_DEV_CHART.some((entry) => entry.film === film.value && entry.developer === 'XTOL'),
-        `missing XTOL entry for ${film.value}`,
+        BW_DEV_CHART.some((entry) => entry.film === film.value),
+        `missing offline entry for ${film.value}`,
       ).toBe(true);
     }
+  });
+
+  it('uses Harman datasheet times and attribution for Kentmere 200', () => {
+    const recipes = findDevChartRecipes(
+      'Kentmere 200',
+      'LC29',
+      '1+29',
+      200,
+      'bw',
+      DEFAULT_SETTINGS,
+    );
+
+    expect(recipes).toHaveLength(1);
+    expect(recipes[0].phases[0].duration).toBe(630);
+    expect(recipes[0].source).toBe('HARMAN Kentmere Pan 200 datasheet (March 2025)');
+    expect(recipes[0].notes).not.toMatch(/rough estimate/i);
+  });
+
+  it('covers the core Ilford developers for additional prelisted films', () => {
+    const films = ['HP5 Plus', 'FP4 Plus', 'Delta 100', 'Kentmere 100', 'Kentmere 400'];
+    const developers = ['DD-X', 'Ilfosol 3', 'Ilfotec HC', 'LC29', 'ID-11', 'Microphen'];
+
+    for (const film of films) {
+      for (const developer of developers) {
+        expect(
+          BW_DEV_CHART.some((entry) => entry.film === film && entry.developer === developer),
+          `missing ${film} in ${developer}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('uses the current manufacturer values for corrected FP4 and Delta 100 entries', () => {
+    const [fp4] = findDevChartRecipes('FP4 Plus', 'DD-X', '1+4', 125, 'bw', DEFAULT_SETTINGS);
+    const [delta100] = findDevChartRecipes(
+      'Delta 100',
+      'ID-11',
+      'Stock',
+      100,
+      'bw',
+      DEFAULT_SETTINGS,
+    );
+
+    expect(fp4.phases[0].duration).toBe(600);
+    expect(fp4.source).toMatch(/FP4 Plus technical datasheet/i);
+    expect(delta100.phases[0].duration).toBe(510);
+    expect(delta100.source).toMatch(/Delta 100 technical datasheet/i);
   });
 
   it('returns the offline XTOL recipe for a previously unsupported stock', () => {
