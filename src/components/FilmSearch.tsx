@@ -162,6 +162,24 @@ function buildSearchError(provider: AIProvider, error: unknown): SearchErrorStat
   }
 }
 
+function buildOfflineDatabaseMissError(
+  provider: AIProvider,
+  query: SearchQuery,
+  reason: 'missing-key' | 'offline',
+): SearchErrorState {
+  const combination = `${query.film} + ${query.developer}`;
+
+  return {
+    code: reason === 'offline' ? 'offline' : 'validation',
+    provider,
+    retryable: false,
+    title: 'Combination not in offline database',
+    message: reason === 'offline'
+      ? `${combination} is not included in DarkTimer's built-in offline database. Reconnect to search for it with AI.`
+      : `${combination} is not included in DarkTimer's built-in offline database. Add or unlock an API key to search for it with AI.`,
+  };
+}
+
 export const FilmSearch: React.FC<FilmSearchProps> = ({
   apiKeys,
   hasEncryptedApiKeys,
@@ -313,17 +331,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
 
       if (showKeyWarning) {
         setShowMissingKeyWarning(true);
-        setSearchError({
-          code: 'validation',
-          provider: nextProvider,
-          retryable: false,
-          title: hasEncryptedApiKeys && isVaultLocked
-            ? 'Unlock saved API keys'
-            : `${PROVIDER_LABELS[nextProvider]} API key required`,
-          message: hasEncryptedApiKeys && isVaultLocked
-            ? 'DarkTimer found saved keys, but they are still locked for this session.'
-            : `Add a ${PROVIDER_LABELS[nextProvider]} API key in Settings before using AI search.`,
-        });
+        setSearchError(buildOfflineDatabaseMissError(nextProvider, normalizedQuery, 'missing-key'));
       }
       return;
     }
@@ -343,7 +351,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
         return;
       }
 
-      setSearchError(buildSearchError(nextProvider, new AIRecipeError('offline', nextProvider)));
+      setSearchError(buildOfflineDatabaseMissError(nextProvider, normalizedQuery, 'offline'));
       return;
     }
 
@@ -729,7 +737,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
         />
       ) : null}
 
-      {!loading && !results && searchError ? (
+      {!loading && !results && searchError && !showMissingKeyWarning ? (
         <div className="utilitarian-border bg-dark-panel p-5 md:p-6 space-y-5">
           <div className="flex items-start gap-3">
             <CircleAlert size={18} className="mt-0.5 shrink-0 text-accent-red" />
@@ -906,14 +914,15 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
             >
               <div className="space-y-2">
                 <p className="text-white font-mono text-sm uppercase tracking-widest">
-                  {hasEncryptedApiKeys && isVaultLocked
-                    ? 'Unlock saved API keys'
-                    : 'Gemini or Mistral API key required'}
+                  {searchError?.title ?? 'Combination not in offline database'}
+                </p>
+                <p className="text-sm text-ui-gray leading-relaxed">
+                  {searchError?.message}
                 </p>
                 <p className="text-sm text-ui-gray leading-relaxed">
                   {hasEncryptedApiKeys && isVaultLocked
-                    ? 'DarkTimer found securely remembered API keys, but they are still locked for this session. Open Settings to unlock them with your passphrase.'
-                    : 'The AI Assistant needs a Gemini or Mistral API key before it can look up development times. Add one in AI Settings and come straight back here.'}
+                    ? 'DarkTimer found securely remembered API keys. Open Settings to unlock them with your passphrase.'
+                    : 'Add a Gemini or Mistral API key in AI Settings, then retry this search.'}
                 </p>
               </div>
 

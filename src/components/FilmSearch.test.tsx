@@ -64,7 +64,7 @@ describe('FilmSearch', () => {
     setOnlineStatus(true);
   });
 
-  it('shows a missing-key warning before calling AI', async () => {
+  it('explains when a combination is absent from the offline database and no API key is available', async () => {
     const user = userEvent.setup();
 
     renderFilmSearch({
@@ -75,7 +75,9 @@ describe('FilmSearch', () => {
     await fillCoreFields(user, 'JCH StreetPan 400', 'Diafine');
     await user.click(screen.getByRole('button', { name: /ask ai/i }));
 
-    expect(screen.getByText('Gemini or Mistral API key required')).toBeInTheDocument();
+    expect(screen.getByText('Combination not in offline database')).toBeInTheDocument();
+    expect(screen.getByText(/JCH StreetPan 400 \+ Diafine is not included/i)).toBeInTheDocument();
+    expect(screen.getByText(/add a Gemini or Mistral API key/i)).toBeInTheDocument();
     expect(getDevTimesMock).not.toHaveBeenCalled();
   });
 
@@ -120,6 +122,21 @@ describe('FilmSearch', () => {
     await user.click(screen.getByRole('button', { name: /search offline/i }));
 
     expect(await screen.findByText(/built-in chart found/i)).toBeInTheDocument();
+    expect(getDevTimesMock).not.toHaveBeenCalled();
+  });
+
+  it('explains when an offline search combination is absent from the built-in database', async () => {
+    setOnlineStatus(false);
+    const user = userEvent.setup();
+
+    renderFilmSearch();
+
+    await fillCoreFields(user, 'JCH StreetPan 400', 'Diafine');
+    await user.click(screen.getByRole('button', { name: /search offline/i }));
+
+    expect(screen.getByText('Combination not in offline database')).toBeInTheDocument();
+    expect(screen.getByText(/JCH StreetPan 400 \+ Diafine is not included/i)).toBeInTheDocument();
+    expect(screen.getByText(/reconnect to search for it with AI/i)).toBeInTheDocument();
     expect(getDevTimesMock).not.toHaveBeenCalled();
   });
 
