@@ -1,5 +1,19 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Save, Eye, EyeOff, ExternalLink, Shield, Bell, Lamp, Volume2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bell,
+  Bot,
+  ChevronRight,
+  Database,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  FlaskConical,
+  Lamp,
+  Save,
+  Shield,
+  Volume2,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   AIProvider,
@@ -38,6 +52,8 @@ interface DurationSettingFieldProps {
   value: number;
   onChange: (value: number) => void;
 }
+
+type SettingsCategory = 'development' | 'display' | 'ai' | 'notifications' | 'data';
 
 const DurationSettingField: React.FC<DurationSettingFieldProps> = ({ label, value, onChange }) => {
   const mins = Math.floor(value / 60);
@@ -212,6 +228,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   const [settingsError, setSettingsError] = useState('');
   const [unlockError, setUnlockError] = useState('');
   const [historyError, setHistoryError] = useState('');
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory | null>(null);
   const vibrationSupported = typeof navigator !== 'undefined' && 'vibrate' in navigator;
   const testAudioContextRef = useRef<AudioContext | null>(null);
 
@@ -408,11 +425,137 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     }
   };
 
+  const openCategory = (category: SettingsCategory) => {
+    setActiveCategory(category);
+    window.scrollTo({ top: 0 });
+  };
+
+  const closeCategory = () => {
+    setActiveCategory(null);
+    window.scrollTo({ top: 0 });
+  };
+
+  const categoryDetails: Record<SettingsCategory, { title: string; description: string }> = {
+    development: {
+      title: 'Development',
+      description: 'Default process timings, temperatures, chemistry tracking, and phase flow.',
+    },
+    display: {
+      title: 'Display',
+      description: 'Choose the screen theme used in normal light and in the darkroom.',
+    },
+    ai: {
+      title: 'AI & API Keys',
+      description: 'Recipe-search provider, key storage, and secure access.',
+    },
+    notifications: {
+      title: 'Alerts & Cues',
+      description: 'Notifications, sound, screen flash, and vibration during a timer.',
+    },
+    data: {
+      title: 'History & Data',
+      description: 'Review local storage and remove session history or app data.',
+    },
+  };
+
+  const categoryIndex: Array<{
+    id: SettingsCategory;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    summary: string;
+  }> = [
+    {
+      id: 'development',
+      icon: FlaskConical,
+      summary: `${settings.defaultBwTempC}°C B&W · ${settings.defaultColorTempC}°C color`,
+    },
+    {
+      id: 'display',
+      icon: Lamp,
+      summary: settings.theme === 'safelight' ? 'Safelight theme' : 'Standard dark theme',
+    },
+    {
+      id: 'ai',
+      icon: Bot,
+      summary: `${settings.aiProvider === 'gemini' ? 'Gemini' : 'Mistral'} · ${hasAnyApiKeys(apiKeys) ? 'Key configured' : 'No API key'}`,
+    },
+    {
+      id: 'notifications',
+      icon: Bell,
+      summary: settings.notificationsEnabled ? 'Notifications enabled' : 'Notifications off',
+    },
+    {
+      id: 'data',
+      icon: Database,
+      summary: `${sessionCount} saved session${sessionCount === 1 ? '' : 's'}`,
+    },
+  ];
+
   return (
-    <div className="w-full max-w-xl space-y-8">
+    <div className="w-full max-w-xl md:max-w-4xl space-y-8">
+
+      {activeCategory === null ? (
+        <div className="space-y-6">
+          <div className="space-y-2 text-center">
+            <h1 className="text-xl font-bold uppercase tracking-tight md:text-2xl">Settings</h1>
+            <p className="mono-label">Development, AI, and notification preferences</p>
+          </div>
+          <p className="text-sm leading-relaxed text-ui-gray">
+            Choose a category to view and change its settings.
+          </p>
+
+          <nav aria-label="Settings categories" className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {categoryIndex.map(({ id, icon: Icon, summary }, index) => {
+              const detail = categoryDetails[id];
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => openCategory(id)}
+                  className="press-feedback group flex w-full items-center gap-4 border border-dark-border bg-dark-panel p-4 text-left transition-colors hover:border-white/40 md:p-5"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center border border-dark-border text-accent-red group-hover:border-accent-red/60">
+                    <Icon size={18} />
+                  </span>
+                  <span className="min-w-0 flex-1 space-y-1">
+                    <span className="block text-sm font-bold uppercase tracking-widest text-white">
+                      {detail.title}
+                    </span>
+                    <span className="block truncate text-xs font-mono text-ui-gray">{summary}</span>
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span className="hidden text-[10px] font-mono uppercase tracking-[0.18em] text-ui-gray sm:block">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <ChevronRight size={18} className="text-ui-gray transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={closeCategory}
+            className="press-feedback inline-flex items-center gap-2 py-2 text-xs font-mono uppercase tracking-[0.18em] text-ui-gray hover:text-white"
+          >
+            <ArrowLeft size={14} />
+            Back to Settings
+          </button>
+          <div className="border-b border-dark-border pb-5">
+            <h1 className="text-3xl font-bold uppercase tracking-tight text-white">
+              {categoryDetails[activeCategory].title}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-ui-gray">
+              {categoryDetails[activeCategory].description}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Development settings */}
-      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-2">
+      {activeCategory === 'development' ? <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-2">
         <div className="space-y-1 pb-2">
           <h2 className="text-xl font-bold uppercase tracking-tight">Development Settings</h2>
           <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
@@ -534,10 +677,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             onToggle={() => handleChange('yoloRun', !settings.yoloRun)}
           />
         </div>
-      </div>
+      </div> : null}
 
       {/* Display */}
-      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-4">
+      {activeCategory === 'display' ? <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-4">
         <div className="space-y-1">
           <h2 className="text-xl font-bold uppercase tracking-tight">Display</h2>
           <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
@@ -584,10 +727,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         <p className="text-xs text-ui-gray font-mono">
           You can also flip themes anytime with the lamp icon in the header or the timer controls.
         </p>
-      </div>
+      </div> : null}
 
       {/* AI settings */}
-      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-2">
+      {activeCategory === 'ai' ? <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-2">
         <div className="space-y-1 pb-2">
           <h2 className="text-xl font-bold uppercase tracking-tight">AI Settings</h2>
           <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
@@ -863,10 +1006,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             <span>{isSaving ? 'Saving API Keys…' : isSavingSettings ? 'Saving Settings…' : 'Save API Keys'}</span>
           </button>
         </div>
-      </div>
+      </div> : null}
 
       {/* Notifications */}
-      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-6">
+      {activeCategory === 'notifications' ? <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-6">
         <div className="space-y-1">
           <h2 className="text-xl font-bold uppercase tracking-tight">Notifications</h2>
           <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">Agitation alerts and phase-end events</p>
@@ -1005,9 +1148,9 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             </div>
           </div>
         )}
-      </div>
+      </div> : null}
 
-      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-5">
+      {activeCategory === 'data' ? <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-5">
         <div className="space-y-1">
           <h2 className="text-xl font-bold uppercase tracking-tight">History & Data</h2>
           <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
@@ -1115,10 +1258,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             </button>
           )}
         </div>
-      </div>
+      </div> : null}
 
-      {settingsError ? <p className="text-xs font-mono text-accent-red">{settingsError}</p> : null}
-      {saveError ? <p className="text-xs font-mono text-accent-red">{saveError}</p> : null}
+      {activeCategory !== null && settingsError ? <p className="text-xs font-mono text-accent-red">{settingsError}</p> : null}
+      {activeCategory === 'ai' && saveError ? <p className="text-xs font-mono text-accent-red">{saveError}</p> : null}
 
     </div>
   );

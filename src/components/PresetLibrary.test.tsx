@@ -17,6 +17,19 @@ const preset = {
 };
 
 describe('PresetLibrary', () => {
+  it('centers its empty state within the available tablet space', () => {
+    render(
+      <PresetLibrary
+        presets={[]}
+        onEdit={vi.fn()}
+        onSelect={vi.fn()}
+        onDelete={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByText(/your library is empty/i).closest('.utilitarian-border')).toHaveClass('mx-auto');
+  });
+
   it('selects a preset when the card is clicked', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

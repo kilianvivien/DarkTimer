@@ -315,9 +315,12 @@ describe('Timer', () => {
         await Promise.resolve();
       });
 
-      expect(screen.getByRole('button', { name: /leave fullscreen/i })).toBeInTheDocument();
+      const leaveFullscreen = screen.getByRole('button', { name: /leave fullscreen/i });
+      expect(leaveFullscreen).toBeInTheDocument();
+      expect(leaveFullscreen.closest('.timer-immersive-exit')).toBeInTheDocument();
+      expect(document.querySelector('.timer-sidebar')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /leave fullscreen/i }));
+      fireEvent.click(leaveFullscreen);
       expect(screen.queryByRole('button', { name: /leave fullscreen/i })).not.toBeInTheDocument();
     } finally {
       Object.defineProperty(window, 'innerWidth', {

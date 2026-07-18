@@ -31,6 +31,12 @@ function renderChemsView(chems: StoredChem[] = []) {
 }
 
 describe('ChemsView', () => {
+  it('centers its empty state within the available tablet space', () => {
+    renderChemsView();
+
+    expect(screen.getByText(/no chemistry tracked yet/i).closest('.utilitarian-border')).toHaveClass('mx-auto');
+  });
+
   it('uses the shared searchable field for new chemistry suggestions', async () => {
     const user = userEvent.setup();
 

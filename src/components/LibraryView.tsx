@@ -41,7 +41,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   return (
     <div className="w-full flex flex-col items-center space-y-6 md:space-y-8">
       {/* Tab switcher */}
-      <div className="flex gap-0 border border-dark-border w-full max-w-2xl">
+      <div className="flex gap-0 border border-dark-border w-full max-w-2xl md:max-w-5xl">
         {TABS.map(({ id, label }) => (
           <button
             key={id}

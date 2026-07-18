@@ -80,20 +80,23 @@ export const SessionView: React.FC<SessionViewProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col landscape:flex-col gap-4 md:gap-8 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
+    <div
+      data-testid="session-layout"
+      className="w-full flex flex-col gap-4 md:gap-5 xl:grid xl:grid-cols-[minmax(16rem,0.85fr)_minmax(0,2.15fr)] xl:items-start xl:gap-6"
+    >
 
-      {/* Recipe info — compact strip in landscape, full card in portrait,
-          left pane on large screens */}
-      <div className="space-y-3 landscape:space-y-0 lg:space-y-3">
+      {/* Tablets use a compact metadata strip above the timer. True desktop
+          widths move the same content into a narrow supporting rail. */}
+      <div className="space-y-3 md:grid md:grid-cols-[auto_minmax(0,1fr)] md:items-stretch md:gap-3 md:space-y-0 xl:block xl:space-y-3">
         <button
           onClick={onExit}
-          className="flex items-center space-x-2 mono-label hover:text-white transition-colors"
+          className="flex items-center space-x-2 mono-label hover:text-white transition-colors md:min-w-40 md:justify-center md:border md:border-dark-border md:bg-dark-panel md:px-5 xl:min-w-0 xl:justify-start xl:border-0 xl:bg-transparent xl:px-0"
         >
           <ChevronLeft size={12} />
           <span>Exit Session</span>
         </button>
 
-        <div className="bg-dark-panel p-4 utilitarian-border space-y-4">
+        <div className="bg-dark-panel p-4 md:px-5 utilitarian-border space-y-4">
           {/* Always-visible compact row */}
           <div className="flex justify-between items-center gap-4">
             <div className="min-w-0">

@@ -24,13 +24,48 @@ function renderSettingsMenu(overrides: Partial<ComponentProps<typeof SettingsMen
   );
 }
 
+async function openCategory(
+  user: ReturnType<typeof userEvent.setup>,
+  name: RegExp,
+) {
+  await user.click(screen.getByRole('button', { name }));
+}
+
 describe('SettingsMenu', () => {
+  it('starts with a category index and opens one focused settings view at a time', async () => {
+    const user = userEvent.setup();
+
+    renderSettingsMenu();
+
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /settings categories/i })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /settings categories/i })).toHaveClass('md:grid-cols-2');
+    expect(screen.getByRole('button', { name: /^development/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^display/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^ai & api keys/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^alerts & cues/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^history & data/i })).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: /yolo run/i })).not.toBeInTheDocument();
+
+    await openCategory(user, /^development/i);
+
+    expect(screen.getByRole('heading', { name: 'Development', level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /back to settings/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /yolo run/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^display/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /back to settings/i }));
+    expect(screen.getByRole('navigation', { name: /settings categories/i })).toBeInTheDocument();
+  });
+
   it('requires a passphrase before saving encrypted keys', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(undefined);
 
     renderSettingsMenu({ onSave });
 
+    await openCategory(user, /^ai & api keys/i);
     await user.click(screen.getByRole('button', { name: /secure remember/i }));
     await user.click(screen.getByRole('button', { name: /gemini api key/i }));
     await user.type(screen.getByPlaceholderText('AIza...'), ' gemini-key ');
@@ -48,6 +83,7 @@ describe('SettingsMenu', () => {
 
     renderSettingsMenu({ onSave });
 
+    await openCategory(user, /^ai & api keys/i);
     await user.click(screen.getByRole('button', { name: /secure remember/i }));
     await user.type(screen.getByPlaceholderText('Create a passphrase'), 'darkroom');
     await user.type(screen.getByPlaceholderText('Confirm passphrase'), 'different');
@@ -70,6 +106,7 @@ describe('SettingsMenu', () => {
     notificationMock.permission = 'granted';
     notificationMock.requestPermission.mockResolvedValueOnce('granted');
 
+    await openCategory(user, /^alerts & cues/i);
     await user.click(screen.getByRole('button', { name: /grant permission/i }));
 
     expect(notificationMock.requestPermission).toHaveBeenCalled();
@@ -92,6 +129,7 @@ describe('SettingsMenu', () => {
       settings: { ...DEFAULT_SETTINGS, apiKeyPersistenceMode: 'encrypted' },
     });
 
+    await openCategory(user, /^ai & api keys/i);
     await user.type(screen.getByPlaceholderText('Enter passphrase'), 'darkroom');
     await user.click(screen.getByRole('button', { name: 'Unlock' }));
     expect(onUnlockSavedKeys).toHaveBeenCalledWith('darkroom');
@@ -107,31 +145,42 @@ describe('SettingsMenu', () => {
 
     renderSettingsMenu();
 
+    await openCategory(user, /^development/i);
     await user.click(screen.getByRole('button', { name: /black & white/i }));
-    await user.click(screen.getByRole('button', { name: /secure remember/i }));
-
-    expect(screen.getByPlaceholderText('Create a passphrase')).toHaveClass('mobile-form-control-inline');
     expect(screen.getByDisplayValue(String(DEFAULT_SETTINGS.defaultBwTempC))).toHaveClass(
       'mobile-form-control-inline',
     );
+
+    await user.click(screen.getByRole('button', { name: /back to settings/i }));
+    await openCategory(user, /^ai & api keys/i);
+    await user.click(screen.getByRole('button', { name: /secure remember/i }));
+
+    expect(screen.getByPlaceholderText('Create a passphrase')).toHaveClass('mobile-form-control-inline');
   });
 
-  it('exposes collapsible sections and switches with accessible state and names', () => {
+  it('exposes detailed controls with accessible state and names', async () => {
+    const user = userEvent.setup();
     renderSettingsMenu();
 
+    await openCategory(user, /^development/i);
     expect(screen.getByRole('button', { name: /black & white/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: /color negative & slide/i })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('switch', { name: /enable notifications/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /yolo run/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /back to settings/i }));
+    await openCategory(user, /^alerts & cues/i);
+    expect(screen.getByRole('switch', { name: /enable notifications/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /vibration cues/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /full flash/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /^border$/i })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('slider', { name: /cue volume/i })).toBeInTheDocument();
   });
 
-  it('disables clear history when there are no saved sessions', () => {
+  it('disables clear history when there are no saved sessions', async () => {
+    const user = userEvent.setup();
     renderSettingsMenu();
 
+    await openCategory(user, /^history & data/i);
     expect(screen.getByRole('button', { name: /clear history/i })).toBeDisabled();
   });
 
@@ -141,6 +190,7 @@ describe('SettingsMenu', () => {
 
     renderSettingsMenu({ onClearHistory, sessionCount: 3 });
 
+    await openCategory(user, /^history & data/i);
     await user.click(screen.getByRole('button', { name: /^clear history$/i }));
     expect(screen.getByText(/clear all saved session history/i)).toBeInTheDocument();
     expect(onClearHistory).not.toHaveBeenCalled();
@@ -155,6 +205,7 @@ describe('SettingsMenu', () => {
 
     renderSettingsMenu({ onSettingsChange });
 
+    await openCategory(user, /^development/i);
     await user.click(screen.getByRole('button', { name: /color negative & slide/i }));
     await user.click(screen.getByRole('button', { name: /no delay/i }));
 
@@ -169,6 +220,7 @@ describe('SettingsMenu', () => {
 
     renderSettingsMenu({ onSettingsChange });
 
+    await openCategory(user, /^development/i);
     const yoloRunToggle = screen.getByRole('switch', { name: /yolo run/i });
     expect(yoloRunToggle).toHaveAttribute('aria-checked', 'false');
 

@@ -4,7 +4,6 @@ import { DevRecipe, type Session } from './services/recipe';
 import { deletePreset, savePreset, updatePreset } from './services/presets';
 import type { Preset } from './services/presets';
 import {
-  Camera,
   Sparkles,
   Info,
   Library,
@@ -20,6 +19,7 @@ import {
   Menu,
   Download,
   Lamp,
+  X,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
@@ -121,6 +121,15 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest('button, a, input, select, textarea, label, [role="button"]'));
 }
 
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 const INSTALL_STEP_ICONS = {
   ellipsis: Ellipsis,
   share: Share,
@@ -136,6 +145,7 @@ export default function App() {
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
   const [view, setView] = useState<View>(getInitialView);
   const [showHelp, setShowHelp] = useState(false);
+  const [showIosSafelightAdvice, setShowIosSafelightAdvice] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [navDirection, setNavDirection] = useState(0);
   const reduceMotion = useReducedMotion();
@@ -337,9 +347,19 @@ export default function App() {
   };
 
   const handleToggleSafelight = () => {
+    const enablingSafelight = settings.theme !== 'safelight';
+    const isPortrait = typeof window !== 'undefined'
+      && window.matchMedia('(orientation: portrait)').matches;
+
+    if (enablingSafelight && isIOSDevice() && isPortrait) {
+      setShowIosSafelightAdvice(true);
+    } else if (!enablingSafelight) {
+      setShowIosSafelightAdvice(false);
+    }
+
     void saveSettings({
       ...settings,
-      theme: settings.theme === 'safelight' ? 'dark' : 'safelight',
+      theme: enablingSafelight ? 'safelight' : 'dark',
     });
   };
 
@@ -484,17 +504,16 @@ export default function App() {
       };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-dark-bg text-white flex flex-col font-sans md:pl-24">
+    <div className="app-shell min-h-screen min-h-[100dvh] bg-dark-bg text-white flex flex-col font-sans md:pl-24">
       {/* Header */}
-      <header className="border-b border-dark-border bg-dark-bg sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
+      <header className="tablet-landscape-hide border-b border-dark-border bg-dark-bg sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div className="max-w-5xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
           <button
             type="button"
-            className="press-feedback flex items-center space-x-2 cursor-pointer text-left"
+            className="press-feedback flex items-center cursor-pointer text-left"
             onClick={reset}
             aria-label="Return to manual timer"
           >
-            <Camera size={16} className="text-accent-red" />
             <span className="font-mono font-bold tracking-tighter text-sm uppercase">DARK<span className="text-accent-red">TIMER</span></span>
           </button>
 
@@ -538,28 +557,76 @@ export default function App() {
       {/* Tablet/desktop navigation rail — phones keep the bottom pill */}
       <nav
         aria-label="Primary"
-        className="hidden md:flex fixed inset-y-0 left-0 z-40 w-24 flex-col items-center justify-center gap-1.5 border-r border-dark-border bg-dark-bg pt-[calc(env(safe-area-inset-top)+3.5rem)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+        className="tablet-landscape-nav hidden md:flex fixed left-[calc(env(safe-area-inset-left)+0.75rem)] top-1/2 z-40 w-[4.75rem] -translate-y-1/2 flex-col items-center gap-0.5 rounded-[1.75rem] border border-white/[0.07] bg-black/55 p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
       >
-        {NAV_ITEMS.map(({ view: v, label, Icon }) => (
+        <div className="tablet-landscape-rail-brand hidden w-full flex-col items-center rounded-[1.5rem] bg-black/55 p-1.5 shadow-[0_14px_40px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
           <button
-            key={v}
-            onClick={() => changeView(v)}
-            disabled={view === 'timer'}
-            className={cn(
-              'press-feedback flex w-[4.5rem] flex-col items-center gap-1.5 rounded-xl px-2 py-3 transition-colors',
-              activeView === v ? 'bg-white text-black' : 'text-ui-gray hover:text-white',
-              view === 'timer' && 'opacity-30 cursor-not-allowed',
-            )}
-            aria-current={activeView === v ? 'page' : undefined}
+            type="button"
+            className="press-feedback flex min-h-16 w-full flex-col items-center justify-center rounded-[1.15rem] py-2 font-mono text-[13px] font-bold uppercase leading-none tracking-tighter"
+            onClick={reset}
+            aria-label="Return to manual timer"
           >
-            <Icon size={18} />
-            <span className="text-[9px] font-mono uppercase tracking-widest leading-none">{label}</span>
+            <span>DARK</span>
+            <span className="text-accent-red">TIMER</span>
           </button>
-        ))}
+        </div>
+
+        <div className="tablet-landscape-main-rail contents">
+          {NAV_ITEMS.map(({ view: v, label, Icon }) => (
+            <button
+              key={v}
+              onClick={() => changeView(v)}
+              disabled={view === 'timer'}
+              className={cn(
+                'press-feedback flex w-full flex-col items-center gap-1.5 rounded-[1.2rem] px-2 py-3 transition-colors',
+                activeView === v
+                  ? 'bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,0.12)]'
+                  : 'text-ui-gray hover:bg-white/[0.05] hover:text-white',
+                view === 'timer' && 'opacity-30 cursor-not-allowed',
+              )}
+              aria-current={activeView === v ? 'page' : undefined}
+            >
+              <Icon size={18} />
+              <span className="text-[9px] font-mono uppercase tracking-widest leading-none">{label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="tablet-landscape-rail-actions hidden w-full flex-col items-center gap-0.5 rounded-[1.5rem] border border-white/[0.07] bg-black/55 p-1.5 shadow-[0_14px_40px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
+          <button
+            onClick={handleToggleSafelight}
+            className={cn(
+              'press-feedback flex w-full items-center justify-center rounded-[1.2rem] transition-colors',
+              settings.theme === 'safelight'
+                ? 'text-accent-red'
+                : 'text-ui-gray hover:bg-white/[0.05] hover:text-white',
+            )}
+            aria-label={settings.theme === 'safelight' ? 'Switch to standard theme' : 'Switch to safelight theme'}
+            aria-pressed={settings.theme === 'safelight'}
+          >
+            <Lamp size={17} />
+          </button>
+          <a
+            href="https://github.com/kilianvivien/DarkTimer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-11 w-full items-center justify-center rounded-[1.2rem] text-ui-gray transition-colors hover:bg-white/[0.05] hover:text-white"
+            aria-label="GitHub repository"
+          >
+            <Github size={17} />
+          </a>
+          <button
+            onClick={() => setShowHelp(true)}
+            className="press-feedback flex w-full items-center justify-center rounded-[1.2rem] text-ui-gray transition-colors hover:bg-white/[0.05] hover:text-white"
+            aria-label="How to use"
+          >
+            <Info size={17} />
+          </button>
+        </div>
       </nav>
 
       <motion.main
-        className="flex-1 flex flex-col items-center px-4 md:px-6 pt-8 md:pt-12 pb-40 md:pb-8 max-w-5xl mx-auto w-full"
+        className="flex-1 flex flex-col items-center px-4 md:px-6 pt-8 md:pt-10 xl:pt-12 pb-40 md:pb-8 max-w-5xl xl:max-w-6xl mx-auto w-full"
         onPanEnd={(event, info) => {
           if (isInteractiveTarget(event.target)) {
             return;
@@ -669,10 +736,6 @@ export default function App() {
                 {...viewMotion}
                 className="w-full flex flex-col items-center space-y-6 md:space-y-8"
               >
-                <div className="text-center space-y-2">
-                  <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Settings</h1>
-                  <p className="mono-label">Development, AI, and notification preferences</p>
-                </div>
                 <SettingsMenu
                   apiKeys={apiKeys}
                   hasEncryptedApiKeys={hasEncryptedApiKeys}
@@ -697,7 +760,7 @@ export default function App() {
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
                 animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="w-full max-w-2xl lg:max-w-5xl mx-auto"
+                className="w-full max-w-2xl md:max-w-5xl xl:max-w-6xl mx-auto"
               >
                 <SessionView
                   recipe={recipe}
@@ -713,20 +776,6 @@ export default function App() {
           </AnimatePresence>
         )}
       </motion.main>
-
-      {/* Desktop footer — hidden on mobile */}
-      <footer className="hidden md:block p-6 border-t border-dark-border">
-        <div className="max-w-5xl mx-auto flex justify-between items-center">
-          <a
-            href="https://github.com/kilianvivien/DarkTimer"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[9px] font-mono uppercase tracking-[0.4em] text-ui-gray hover:text-white transition-colors"
-          >
-            DarkTimer — MIT Licence
-          </a>
-        </div>
-      </footer>
 
       {/* Mobile bottom nav bar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pointer-events-none">
@@ -761,17 +810,17 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 md:p-6"
+            className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-sm sm:items-center md:p-6"
             onClick={() => setShowHelp(false)}
           >
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="bg-black/70 backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_32px_64px_rgba(0,0,0,0.7)] max-w-md w-full p-6 md:p-8 space-y-6 rounded-2xl"
+              className="help-modal-panel bg-black/70 backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_32px_64px_rgba(0,0,0,0.7)] max-w-md w-full p-6 md:p-8 space-y-6 rounded-2xl"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-start">
+              <div className="sticky top-0 z-10 -mx-1 flex items-start justify-between bg-black/90 px-1 py-1 backdrop-blur-xl">
                 <h2 className="font-mono text-sm uppercase tracking-widest text-white">How to use DarkTimer</h2>
                 <button
                   type="button"
@@ -783,29 +832,69 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="space-y-5 text-sm font-mono text-ui-gray leading-relaxed">
-                <div className="space-y-1">
-                  <p className="text-white uppercase tracking-widest text-xs">Manual</p>
-                  <p>Choose your process mode, confirm the default temperature, and build a phase-by-phase manual recipe with explicit agitation choices.</p>
+              <p className="text-sm leading-relaxed text-white/65">
+                Choose a workflow, prepare the recipe, then review every phase before starting. Recipes, chemistry, and session history stay on this device.
+              </p>
+
+              <div className="help-modal-grid grid grid-cols-1 gap-4 text-ui-gray">
+                <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4">
+                  <p className="font-mono text-xs uppercase tracking-widest text-white">Manual</p>
+                  <p className="text-sm leading-relaxed">Build a recipe from scratch: choose the process, film, developer, dilution, ISO, and temperature. Set the duration and agitation for each bath, then save it or start immediately.</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-white uppercase tracking-widest text-xs">AI Assistant</p>
-                  <p>Let Gemini or Mistral suggest development times based on your film, chemistry, process mode, and temperature. Add your API keys in AI Settings first.</p>
+                <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4">
+                  <p className="font-mono text-xs uppercase tracking-widest text-white">AI Assistant</p>
+                  <p className="text-sm leading-relaxed">Enter your film and developer to look for a starting point. DarkTimer checks its offline chart and cache first, then uses Gemini or Mistral when a local API key and connection are available.</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-white uppercase tracking-widest text-xs">Library</p>
-                  <p>Save recipes from Manual or AI mode to keep them here. Switch to the History tab to review completed and interrupted sessions on-device.</p>
+                <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4">
+                  <p className="font-mono text-xs uppercase tracking-widest text-white">Run the Timer</p>
+                  <p className="text-sm leading-relaxed">Review the recipe and developer compensation before starting. The timer advances through each bath, signals agitation and phase changes, and can resume an interrupted active session.</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-white uppercase tracking-widest text-xs">Chems</p>
-                  <p>Track your chemistry batches — add developers and fixers, record their mix date, expiration, and roll count. Warnings appear when a batch is aging or nearing capacity.</p>
+                <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4">
+                  <p className="font-mono text-xs uppercase tracking-widest text-white">Library</p>
+                  <p className="text-sm leading-relaxed">Recipes holds reusable presets saved from Manual or AI. History records completed and interrupted sessions so you can inspect what was run and quickly reuse a proven setup.</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-white uppercase tracking-widest text-xs">Settings</p>
-                  <p>Set your development defaults, choose your AI provider, add your API keys, manage notifications, configure chemistry roll-count warnings, and clear session history.</p>
+                <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4">
+                  <p className="font-mono text-xs uppercase tracking-widest text-white">Chemistry</p>
+                  <p className="text-sm leading-relaxed">Track developer and fixer batches by mix date, expiry, and roll count. Capacity and age warnings help you decide when chemistry should be checked or replaced.</p>
+                </div>
+                <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4">
+                  <p className="font-mono text-xs uppercase tracking-widest text-white">Settings</p>
+                  <p className="text-sm leading-relaxed">Set development defaults and display mode, manage local API keys, choose alerts and cues, configure chemistry tracking, and control saved history and app data.</p>
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showIosSafelightAdvice && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="fixed inset-x-4 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[65] landscape:hidden"
+            role="status"
+          >
+            <div className="mx-auto max-w-md rounded-2xl border border-accent-red/35 bg-black/90 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.75)] backdrop-blur-2xl">
+              <div className="flex items-start gap-3">
+                <Lamp size={18} className="mt-0.5 shrink-0 text-accent-red" />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent-red">iPhone safelight tip</p>
+                  <p className="text-sm leading-relaxed text-white/72">
+                    Rotate to landscape so iOS hides its bright status bar. For the safest setup, also enable iOS Color Tint and lower display brightness.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowIosSafelightAdvice(false)}
+                  className="press-feedback -mr-1 -mt-1 flex h-11 w-11 items-center justify-center rounded-full text-ui-gray hover:text-white"
+                  aria-label="Dismiss iPhone safelight tip"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

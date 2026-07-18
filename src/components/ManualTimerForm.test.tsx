@@ -26,14 +26,16 @@ describe('ManualTimerForm', () => {
     expect(developerRow).not.toBeNull();
     expect(fixerRow).not.toBeNull();
 
-    const developerAgitation = within(developerRow as HTMLElement).getByRole('combobox');
-    const fixerAgitation = within(fixerRow as HTMLElement).getByRole('combobox');
+    const developerAgitation = within(developerRow as HTMLElement).getByRole('button', { name: /agitation 1m/i });
+    const fixerAgitation = within(fixerRow as HTMLElement).getByRole('button', { name: /agitation 1m/i });
 
-    await user.selectOptions(developerAgitation, 'every-30s');
-    expect(fixerAgitation).toHaveValue('every-30s');
+    await user.click(developerAgitation);
+    await user.click(within(developerRow as HTMLElement).getByRole('option', { name: '30 sec' }));
+    expect(fixerAgitation).toHaveTextContent('30 sec');
 
-    await user.selectOptions(fixerAgitation, 'stand');
-    expect(fixerAgitation).toHaveValue('every-30s');
+    await user.click(fixerAgitation);
+    await user.click(within(fixerRow as HTMLElement).getByRole('option', { name: 'Stand' }));
+    expect(fixerAgitation).toHaveTextContent('30 sec');
 
     await user.click(screen.getByRole('button', { name: 'Color Negative & Slide' }));
     expect(screen.getByDisplayValue('Blix')).toBeInTheDocument();
@@ -55,6 +57,8 @@ describe('ManualTimerForm', () => {
     await user.type(screen.getByRole('combobox', { name: /film stock/i }), 'HP5 Plus');
     await user.type(screen.getByRole('combobox', { name: /^developer$/i }), 'ID-11');
     await user.type(screen.getByRole('combobox', { name: /dilution/i }), '1+1');
+    await user.click(screen.getByRole('button', { name: /iso 400/i }));
+    await user.click(screen.getByRole('option', { name: '800' }));
     await user.click(screen.getByRole('button', { name: /start session/i }));
 
     expect(onStart).toHaveBeenCalledWith(
@@ -62,6 +66,7 @@ describe('ManualTimerForm', () => {
         film: 'HP5 Plus',
         developer: 'ID-11',
         dilution: '1+1',
+        iso: 800,
         processMode: 'bw',
         tempC: DEFAULT_SETTINGS.defaultBwTempC,
         notes: 'Manual entry',
@@ -131,7 +136,7 @@ describe('ManualTimerForm', () => {
 
     const phaseNameInput = screen.getByDisplayValue('Developer');
     const [minutesInput] = within(developerRow as HTMLElement).getAllByRole('spinbutton');
-    const phaseAgitationSelect = within(developerRow as HTMLElement).getByRole('combobox');
+    const phaseAgitationSelect = within(developerRow as HTMLElement).getByRole('button', { name: /agitation 1m/i });
 
     expect(phaseNameInput).toHaveClass('mobile-form-control-inline');
     expect(minutesInput).toHaveClass('mobile-form-control-inline');
@@ -139,6 +144,7 @@ describe('ManualTimerForm', () => {
     expect(screen.getByRole('combobox', { name: /film stock/i })).toHaveClass('utilitarian-input');
     expect(screen.getByRole('combobox', { name: /^developer$/i })).toHaveClass('utilitarian-input');
     expect(screen.getByRole('combobox', { name: /dilution/i })).toHaveClass('utilitarian-input');
+    expect(screen.getByRole('button', { name: /start session/i }).closest('form')).toHaveClass('md:max-w-5xl');
   });
 
   it('reuses the shared suggestions for film, developer, and dilution', async () => {

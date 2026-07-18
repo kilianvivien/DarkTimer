@@ -730,7 +730,7 @@ export const Timer: React.FC<TimerProps> = ({
         }
       }}
       className={cn(
-        "relative overflow-hidden flex flex-col landscape:flex-row bg-dark-panel utilitarian-border w-full transition-colors duration-500 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]",
+        "timer-shell relative overflow-hidden flex flex-col landscape:flex-row bg-dark-panel utilitarian-border w-full transition-colors duration-500 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]",
         isImmersiveMode && "fixed inset-0 z-[70] h-[100dvh] w-screen max-w-none justify-between border-0 bg-dark-bg shadow-none",
         isAgitating ? "border-accent-red" : "border-dark-border"
       )}
@@ -774,7 +774,7 @@ export const Timer: React.FC<TimerProps> = ({
       {/* Left / main: phase header + time + progress */}
       <div
         className={cn(
-          "relative flex flex-col items-center landscape:justify-center landscape:flex-1 p-5 sm:p-6 md:p-10 space-y-5 sm:space-y-6 landscape:space-y-4",
+          "timer-main relative flex flex-col items-center landscape:justify-center landscape:flex-1 p-5 sm:p-6 md:p-8 xl:p-10 space-y-5 sm:space-y-6 landscape:space-y-4",
           isImmersiveMode && "flex-1 justify-center"
         )}
       >
@@ -903,13 +903,14 @@ export const Timer: React.FC<TimerProps> = ({
       </div>
 
       {/* Right / sidebar: agitation + controls + upcoming */}
-      <div className="relative flex flex-col landscape:justify-between landscape:w-64 landscape:border-l landscape:border-dark-border p-4 sm:p-6 landscape:p-5 space-y-5 sm:space-y-6 landscape:space-y-4 border-t landscape:border-t-0 border-dark-border">
+      <div className="timer-sidebar relative flex flex-col landscape:justify-between landscape:w-56 xl:landscape:w-60 landscape:border-l landscape:border-dark-border p-4 sm:p-6 landscape:p-5 space-y-5 sm:space-y-6 landscape:space-y-4 border-t landscape:border-t-0 border-dark-border">
 
         {currentPhase && (
           <button
             type="button"
             onClick={cycleAgitation}
             className={cn(
+              "timer-agitation",
               "w-full text-left px-4 py-4 utilitarian-border transition-colors",
               isAgitating ? "bg-accent-red/10 border-accent-red/50" : "bg-dark-bg border-dark-border"
             )}
@@ -927,7 +928,7 @@ export const Timer: React.FC<TimerProps> = ({
         )}
 
         {/* Controls */}
-        <div className="flex flex-col gap-2">
+        <div className="timer-controls flex flex-col gap-2">
           {/* Landscape-only Start button */}
           <button
             onClick={toggleTimer}
@@ -944,7 +945,7 @@ export const Timer: React.FC<TimerProps> = ({
           </button>
 
           {/* Icon buttons — portrait and landscape */}
-          <div className="flex flex-wrap items-center justify-center gap-3 landscape:gap-2">
+          <div className="timer-icon-controls flex flex-wrap items-center justify-center gap-3 landscape:gap-2">
             <button
               onClick={toggleMute}
               className="utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0"
@@ -994,7 +995,7 @@ export const Timer: React.FC<TimerProps> = ({
           </div>
         </div>
 
-        <div className="space-y-3 pt-4 landscape:pt-0 border-t landscape:border-t-0 border-dark-border landscape:border-none">
+        <div className="timer-upcoming space-y-3 pt-4 landscape:pt-0 border-t landscape:border-t-0 border-dark-border landscape:border-none">
           <p className="mono-label">
             {isImmersiveMode ? 'Swipe left to skip · down to exit' : 'Swipe left to skip'}
           </p>
@@ -1007,7 +1008,7 @@ export const Timer: React.FC<TimerProps> = ({
         </div>
 
         {isImmersiveMode && (
-          <div className="flex justify-center pt-2 sm:pt-3">
+          <div className="timer-immersive-exit flex justify-center pt-2 sm:pt-3">
             <div className="flex items-center gap-0.5 p-1 rounded-[1.5rem] bg-black/60 backdrop-blur-2xl border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_32px_rgba(0,0,0,0.6)]">
               <button
                 type="button"

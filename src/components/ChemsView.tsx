@@ -525,7 +525,7 @@ export const ChemsView: React.FC<ChemsViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-2xl lg:max-w-5xl space-y-4">
+    <div className="w-full max-w-2xl md:max-w-5xl space-y-4">
       {/* Add button */}
       <div className="flex justify-end">
         <button
@@ -688,7 +688,7 @@ export const ChemsView: React.FC<ChemsViewProps> = ({
           className="max-w-2xl"
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
           <AnimatePresence>
             {chems.map((chem) => (
               <ChemCard

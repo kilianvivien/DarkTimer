@@ -75,7 +75,7 @@ describe('FilmSearch', () => {
     await fillCoreFields(user, 'JCH StreetPan 400', 'Diafine');
     await user.click(screen.getByRole('button', { name: /ask ai/i }));
 
-    expect(screen.getByText('Combination not in offline database')).toBeInTheDocument();
+    expect(await screen.findByText('Combination not in offline database')).toBeInTheDocument();
     expect(screen.getByText(/JCH StreetPan 400 \+ Diafine is not included/i)).toBeInTheDocument();
     expect(screen.getByText(/add a Gemini or Mistral API key/i)).toBeInTheDocument();
     expect(getDevTimesMock).not.toHaveBeenCalled();
@@ -134,7 +134,7 @@ describe('FilmSearch', () => {
     await fillCoreFields(user, 'JCH StreetPan 400', 'Diafine');
     await user.click(screen.getByRole('button', { name: /search offline/i }));
 
-    expect(screen.getByText('Combination not in offline database')).toBeInTheDocument();
+    expect(await screen.findByText('Combination not in offline database')).toBeInTheDocument();
     expect(screen.getByText(/JCH StreetPan 400 \+ Diafine is not included/i)).toBeInTheDocument();
     expect(screen.getByText(/reconnect to search for it with AI/i)).toBeInTheDocument();
     expect(getDevTimesMock).not.toHaveBeenCalled();
@@ -147,7 +147,8 @@ describe('FilmSearch', () => {
     expect(screen.getByRole('combobox', { name: /film stock/i })).toHaveClass('mobile-form-control-inline');
     expect(screen.getByRole('combobox', { name: /^developer$/i })).toHaveClass('utilitarian-input');
     expect(screen.getByRole('combobox', { name: /dilution/i })).toHaveClass('utilitarian-input');
-    expect(screen.getByRole('combobox', { name: /^iso$/i })).toHaveClass('mobile-form-control-compact');
+    expect(screen.getByRole('button', { name: /iso 400/i })).toHaveClass('mobile-form-control-compact');
+    expect(screen.getByLabelText(/ai search/i)).toHaveClass('md:max-w-5xl');
   });
 
   it('filters film suggestions by process mode', async () => {
@@ -368,6 +369,7 @@ describe('FilmSearch', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/gemini found 1 option/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /ask ai/i })).toBeEnabled();
     });
 
     await user.click(screen.getByRole('button', { name: /mistral/i }));
@@ -430,6 +432,9 @@ describe('FilmSearch', () => {
 
     setOnlineStatus(false);
     window.dispatchEvent(new Event('offline'));
+    await waitFor(() => {
+      expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
+    });
 
     const aiSearch = screen.getByLabelText(/ai search/i);
     fireEvent.touchStart(aiSearch, {
@@ -440,9 +445,11 @@ describe('FilmSearch', () => {
     });
     fireEvent.touchEnd(aiSearch);
 
-    expect(screen.queryByText(/gemini found 1 option/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText(/gemini found 1 option/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
+    });
     expect(getDevTimesMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
   });
 
   it('keeps only the newest overlapping request result', async () => {

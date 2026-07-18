@@ -19,6 +19,7 @@ import {
 import { SearchableField } from './SearchableField';
 import { getCachedAiRecipe, saveCachedAiRecipe } from '../services/storage';
 import { findDevChartRecipes } from '../services/devChart';
+import { ThemedSelectField } from './ThemedSelectField';
 
 interface FilmSearchProps {
   apiKeys: Record<AIProvider, string>;
@@ -51,6 +52,7 @@ interface SearchErrorState {
 const MOBILE_BREAKPOINT = 768;
 const REFRESH_THRESHOLD_PX = 72;
 const MAX_PULL_DISTANCE_PX = 108;
+const ISO_SELECT_OPTIONS = ISO_OPTIONS.map(String);
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
   gemini: 'Gemini',
@@ -557,7 +559,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
 
   return (
     <div
-      className="w-full max-w-2xl space-y-8"
+      className="w-full max-w-2xl md:max-w-5xl space-y-8"
       aria-label="AI search"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -627,21 +629,12 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
               onChange={setDilution}
             />
           </div>
-          <div className="space-y-1">
-            <label htmlFor="ai-iso" className="mono-label">ISO</label>
-            <select
-              id="ai-iso"
-              value={iso}
-              onChange={(event) => setIso(parseInt(event.target.value, 10))}
-              className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
-            >
-              {ISO_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </div>
+          <ThemedSelectField
+            label="ISO"
+            options={ISO_SELECT_OPTIONS}
+            value={String(iso)}
+            onChange={(value) => setIso(Number(value))}
+          />
         </div>
 
         <div className="utilitarian-border bg-dark-panel p-5 md:p-6 space-y-5">
@@ -707,7 +700,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {[0, 1].map((card) => (
                 <div key={card} className="utilitarian-border bg-black/20 p-4 space-y-4">
                   <div className="flex items-start justify-between gap-3">
@@ -802,7 +795,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
             {results.options.map((option, index) => {
               const totalDuration = getTotalRecipeDuration(option);
               const phasePreview = option.phases.slice(0, 3);

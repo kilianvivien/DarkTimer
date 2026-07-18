@@ -17,7 +17,7 @@ export function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className={cn('w-full utilitarian-border bg-dark-panel p-8 text-center space-y-4', className)}>
+    <div className={cn('mx-auto w-full utilitarian-border bg-dark-panel p-8 text-center space-y-4', className)}>
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-dark-border bg-black/40">
         <Icon size={24} className="text-ui-gray" />
       </div>

@@ -39,6 +39,8 @@ describe('SessionView', () => {
       />,
     );
 
+    expect(screen.getByTestId('session-layout')).toHaveClass('xl:grid');
+    expect(screen.getByTestId('session-layout')).not.toHaveClass('lg:grid');
     expect(screen.getByText('HP5 Plus')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /exit session/i }));
     expect(onExit).toHaveBeenCalledTimes(1);

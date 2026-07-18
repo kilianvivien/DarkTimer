@@ -21,6 +21,7 @@ import type { Preset } from '../services/presetTypes';
 import { ProcessModeSwitch } from './ProcessModeSwitch';
 import { SearchableField } from './SearchableField';
 import { TemperatureInput } from './TemperatureInput';
+import { ThemedSelectField } from './ThemedSelectField';
 
 interface ManualTimerFormProps {
   editingPreset?: Preset | null;
@@ -32,6 +33,7 @@ interface ManualTimerFormProps {
 }
 
 const AGITATION_OPTIONS: AgitationMode[] = ['every-60s', 'every-30s', 'stand'];
+const ISO_SELECT_OPTIONS = ISO_OPTIONS.map(String);
 
 const createBwPhases = (s: UserSettings): DevPhase[] => [
   { name: 'Developer', duration: s.defaultBwDeveloper, agitationMode: 'every-60s' },
@@ -206,7 +208,7 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-8">
+    <form onSubmit={handleSubmit} className="w-full max-w-2xl md:max-w-5xl space-y-8">
       <div className="utilitarian-border bg-dark-panel p-5 md:p-6 space-y-4">
         {isEditing ? (
           <div className="flex flex-col gap-3 border-b border-dark-border pb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -268,19 +270,12 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({
             onChange={setDilution}
           />
         </div>
-        <div className="space-y-1">
-          <label htmlFor="manual-iso" className="mono-label">ISO</label>
-          <select
-            id="manual-iso"
-            value={iso}
-            onChange={(e) => setIso(parseInt(e.target.value, 10))}
-            className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
-          >
-            {ISO_OPTIONS.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-        </div>
+        <ThemedSelectField
+          label="ISO"
+          options={ISO_SELECT_OPTIONS}
+          value={String(iso)}
+          onChange={(value) => setIso(Number(value))}
+        />
       </div>
 
       <div className="space-y-4">
@@ -349,18 +344,13 @@ export const ManualTimerForm: React.FC<ManualTimerFormProps> = ({
                     </div>
                   </div>
                   <div className="flex-1">
-                    <label className="mono-label mb-1 block">Agitation</label>
-                    <select
+                    <ThemedSelectField
+                      label="Agitation"
+                      options={AGITATION_OPTIONS}
                       value={phase.agitationMode ?? 'stand'}
-                      onChange={(e) => updatePhase(i, 'agitationMode', e.target.value as AgitationMode)}
-                      className="utilitarian-input mobile-form-control-compact w-full bg-dark-panel px-3 py-2"
-                    >
-                      {AGITATION_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {getAgitationLabel(option)}
-                        </option>
-                      ))}
-                    </select>
+                      getOptionLabel={(option) => getAgitationLabel(option as AgitationMode)}
+                      onChange={(value) => updatePhase(i, 'agitationMode', value as AgitationMode)}
+                    />
                   </div>
                 </div>
               </div>

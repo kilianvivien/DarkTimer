@@ -49,7 +49,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ sessions }) => {
   return (
     <section
       aria-label="Session history"
-      className="grid w-full max-w-3xl grid-cols-1 gap-4 lg:max-w-5xl lg:grid-cols-2 lg:items-start"
+      className="grid w-full max-w-3xl grid-cols-1 gap-4 md:max-w-5xl md:grid-cols-2 md:items-start"
     >
       <AnimatePresence initial={false}>
         {sessions.map((session) => {
