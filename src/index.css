@@ -138,6 +138,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/*
+ * Use the classic transform property for rail centering. Tailwind's translate
+ * utility uses the individual `translate` property, which the production CSS
+ * optimizer did not reliably reset inside the landscape media query.
+ */
+.tablet-landscape-nav {
+  transform: translateY(-50%);
+}
+
 @media (min-width: 768px) {
   .utilitarian-input,
   .mobile-form-control-inline {
@@ -161,7 +170,6 @@
     height: auto !important;
     max-height: none !important;
     transform: none !important;
-    translate: none !important;
     justify-content: space-between;
     gap: 0.75rem;
     overflow: visible;

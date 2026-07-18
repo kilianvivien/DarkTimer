@@ -1,86 +1,101 @@
 # DarkTimer
 
-A utilitarian darkroom timer for analog film development. Look up development recipes via AI, build custom multi-phase workflows, and run guided timers with agitation cues — all in a minimal dark-mode interface built for mobile and desktop.
+A local-first darkroom timer for analog film development. Build or find a recipe, prepare each bath, and run a guided multi-phase timer with agitation cues from an installable PWA designed for phones and tablets.
 
-**[Live demo → darktimer.vercel.app](https://darktimer.vercel.app)**
-
----
+**[Open DarkTimer → darktimer.vercel.app](https://darktimer.vercel.app)**
 
 ![DarkTimer screenshots showing the timer, AI assistant, and chemistry views](.github/assets/screenshots.png)
 
----
+## Highlights
 
-## Features
+- **Darkroom-ready timer** — multi-phase countdowns, agitation reminders, phase-change cues, wake lock, fullscreen/immersive mode, and interrupted-session recovery.
+- **Safelight theme** — switch the entire interface to a deep-red-on-black palette from the app header or timer controls.
+- **Manual and assisted recipes** — build a recipe yourself, search the built-in development chart, reuse cached results offline, or optionally query Gemini or Mistral.
+- **Local recipe library and history** — save presets and inspect completed, partial, or aborted timer sessions.
+- **Chemistry tracking** — monitor developer and fixer age, capacity, and roll count, with optional developer-reuse compensation.
+- **Installable and offline-capable** — runs as a PWA on iPhone, iPad, Android, and desktop browsers. Core timer and library features remain available without a connection.
 
-### Interactive Timer
-Guided multi-phase countdown with:
-- **Agitation alerts** — visual (red flash overlay), audio (440 Hz beep), and vibration cues at each agitation cycle
-- **Phase-end audio** — 880 Hz beep when a phase completes; timer pauses before advancing
-- **Per-phase countdown** — configurable 0 / 5 / 10 s delay before each phase starts, with descending audio beeps
-- **Yolo Run** — auto-advances to the next phase without any manual tap, for hands-off workflows
-- **Developer reuse compensation** — adds extra development time based on a fixed percentage (custom or auto-calculated from your Chems log)
-- **Web Notifications** — optional browser notifications for agitation and phase-end events
-- **Fullscreen / immersive mode** — Web Fullscreen API where supported, immersive fallback on mobile
-- **Wake lock** — keeps the screen on during an active session
-- **Session resumption** — interrupted sessions are saved and can be picked up exactly where you left off
-- Controls: Start / Pause, Reset phase, Skip phase, Mute audio
+## Timer
 
-### AI Recipe Finder
-Query development times for any film/developer combination using **Gemini** or **Mistral**. The AI cross-references published data (including the Massive Dev Chart) and returns up to three recipe options with phases, temperatures, and notes. Results are cached and automatically saved to your Library. Supports pull-to-refresh on mobile.
+DarkTimer runs configurable development phases such as Developer, Stop Bath, Fixer, Blix, and Wash.
 
-### Manual Recipe Builder
-Build fully custom multi-phase development workflows from scratch:
-- Searchable film stock, developer, and dilution dropdowns
-- ISO selector, temperature input, and process mode toggle (**B&W** vs **Color / Slide**)
-- Add, remove, and reorder phases (Developer, Stop Bath, Fixer, Wash, Blix, or anything custom) with per-phase name, duration, and agitation mode
+- Agitation modes for every 60 seconds, every 30 seconds, or stand development
+- Visual flash, vibration, and 440 Hz agitation cues
+- 880 Hz phase-end cues and optional Web Notifications
+- Optional 0, 5, or 10 second countdown before each phase
+- **Yolo Run** for automatic progression through the complete workflow
+- Start/pause, reset phase, skip phase, mute, and agitation override controls
+- Screen wake lock and landscape-friendly immersive timer layout
+- Active-session persistence so an interrupted timer can be resumed
+- Developer compensation based on a custom percentage or matching chemistry record
 
-### Recipe Library
-Save and reuse your development presets locally. One tap to jump straight into a timer session. Full create / edit / delete support with presets stored in IndexedDB.
+Browser capabilities vary. DarkTimer degrades gracefully when wake lock, vibration, fullscreen, or notifications are unavailable.
 
-### Session History
-Every timer run is recorded with start/end time, total duration, phases completed, compensation applied, and a status badge (Completed / Partial / Aborted). Expandable cards show the full recipe snapshot for each session.
+## Recipes and data
 
-### Chemistry Tracker (Chems)
-Log your developer and fixer batches with mix date, expiration date, max rolls, and a live roll counter:
-- **Warnings** when a batch approaches capacity or expiration (within 7 days)
-- **Auto-track** — automatically increments the matching developer's roll count after each completed session
-- **Auto compensation** — developer reuse compensation reads roll count directly from the matched Chems entry
+### Manual builder
 
-### Settings
-- Default phase durations for B&W and Color / Slide process modes
-- AI provider selection (Gemini / Mistral) and API key management — keys are stored only in your browser, never sent to a server. Choose between session-only storage or AES-encrypted persistent storage with a passphrase
-- Notifications toggle (requires browser permission)
-- Agitation flash overlay and vibration toggles
-- Phase countdown duration (0 / 5 / 10 s)
-- Yolo Run toggle
-- Auto-track chem rolls toggle
-- Clear history / factory reset
+Create B&W or Color/Slide recipes with film, developer, dilution, ISO, temperature, phase duration, and agitation settings. Recipes can be saved as reusable presets or started immediately.
 
----
+### Recipe lookup
 
-## Stack
+The Assistant checks DarkTimer's built-in development chart and local cache before making a live AI request. Gemini and Mistral are optional and use an API key supplied by the user. Returned recipes include structured phases, temperature, and notes that can be reviewed before starting.
 
-React 19 · Vite 6 · TypeScript · Tailwind CSS v4 · Framer Motion · PWA
+AI-generated development times are starting points, not authoritative processing instructions. Confirm critical recipes against the film and chemistry manufacturers' current datasheets.
 
----
+### Library, history, and Chems
 
-## Getting Started
+- Save, edit, reuse, and delete recipe presets.
+- Review timer sessions with status, timing, completed phases, compensation, and the recipe snapshot used for the run.
+- Track developer and fixer batches by mix date, expiration, capacity, and roll count.
+- Optionally increment a matched developer's roll count after a completed session.
 
-**Prerequisites:** Node.js 18+, plus a [Gemini API key](https://aistudio.google.com/apikey) or [Mistral API key](https://console.mistral.ai/api-keys/)
+## Privacy and offline behavior
+
+DarkTimer has no user account or application backend. Recipes, settings, chemistry records, session history, active timers, and cached lookups are stored locally in IndexedDB.
+
+API keys are sent directly from the browser to the selected provider and are never sent to a DarkTimer server. Keys can be kept for the current browser session only or saved in the local encrypted vault with a passphrase.
+
+After the PWA assets have been cached, manual recipes, saved presets, chemistry tracking, history, and timers work offline. The Assistant can still use the built-in chart and previously cached results; a new live AI lookup requires a connection.
+
+> On iOS, Safari tabs and Home Screen apps use separate storage. Recipes created in Safari do not automatically transfer to the installed PWA.
+
+## Install as an app
+
+DarkTimer can run directly in a browser, but installation gives the most app-like timer experience.
+
+- **iPhone or iPad:** open the site in Safari, choose **Share → Add to Home Screen**, enable **Open as Web App**, then launch DarkTimer from the Home Screen.
+- **Android or desktop Chromium:** use the browser's install action or choose **Install DarkTimer** from its menu.
+
+The app detects available installation methods and provides platform-specific guidance after you have used it enough to establish local data.
+
+## Local development
+
+Prerequisite: a current Node.js LTS release and npm. An API key is not required for manual recipes or built-in chart results.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000), go to **Settings**, choose your preferred AI provider, and paste your API key to enable the AI Assistant. No `.env` file needed — keys are stored in your browser.
+The development server runs at [localhost:3000](http://localhost:3000) and binds to the local network for testing on phones and tablets.
 
-### PWA
+Useful commands:
 
-DarkTimer is a Progressive Web App, designed for phones and tablets. It can be installed on iOS Safari, Android Chrome, and desktop Chrome. An install prompt appears automatically on supported platforms.
+```bash
+npm run lint          # TypeScript checks
+npm run test          # Run the Vitest suite once
+npm run test:watch    # Run tests in watch mode
+npm run build         # Create the production PWA in dist/
+npm run preview       # Preview the production build
+```
 
----
+## Stack
+
+React 19 · Vite 6 · TypeScript · Tailwind CSS v4 · Motion · IndexedDB · Vitest · vite-plugin-pwa
+
+DarkTimer is a web-only PWA; there is no native desktop wrapper or server component.
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).

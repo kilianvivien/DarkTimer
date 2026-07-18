@@ -557,7 +557,7 @@ export default function App() {
       {/* Tablet/desktop navigation rail — phones keep the bottom pill */}
       <nav
         aria-label="Primary"
-        className="tablet-landscape-nav hidden md:flex fixed left-[calc(env(safe-area-inset-left)+0.75rem)] top-1/2 z-40 w-[4.75rem] -translate-y-1/2 flex-col items-center gap-0.5 rounded-[1.75rem] border border-white/[0.07] bg-black/55 p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
+        className="tablet-landscape-nav hidden md:flex fixed left-[calc(env(safe-area-inset-left)+0.75rem)] top-1/2 z-40 w-[4.75rem] flex-col items-center gap-0.5 rounded-[1.75rem] border border-white/[0.07] bg-black/55 p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
       >
         <div className="tablet-landscape-rail-brand hidden w-full flex-col items-center rounded-[1.5rem] bg-black/55 p-1.5 shadow-[0_14px_40px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
           <button

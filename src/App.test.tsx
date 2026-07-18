@@ -98,6 +98,7 @@ describe('App', () => {
     expect(navigation).toHaveClass('backdrop-blur-2xl');
     expect(navigation).not.toHaveClass('inset-y-0');
     expect(navigation).not.toHaveClass('border-r');
+    expect(navigation).not.toHaveClass('-translate-y-1/2');
   });
 
   it('renders the DarkTimer wordmark without a camera icon', () => {
