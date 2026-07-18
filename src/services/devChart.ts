@@ -6,10 +6,9 @@ import type { UserSettings } from './userSettings';
  *
  * A curated set of published manufacturer starting points so the app can
  * still suggest a recipe with no network and no API key. Times are for box
- * speed at the listed temperature, compiled from manufacturer datasheets and
- * cross-checked against the Massive Dev Chart (digitaltruth.com). They are
- * STARTING POINTS — the UI must always tell users to verify against the
- * current datasheet for their batch.
+ * speed at the listed temperature, compiled from manufacturer datasheets.
+ * They are STARTING POINTS — the UI must always tell users to verify against
+ * the current datasheet for their batch.
  *
  * When the requested temperature or EI differs from the chart entry, the
  * lookup scales the developer time with generic compensation factors
