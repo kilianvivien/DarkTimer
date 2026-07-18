@@ -677,6 +677,24 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             onToggle={() => handleChange('yoloRun', !settings.yoloRun)}
           />
         </div>
+
+        <div className="space-y-4 border-t border-dark-border pt-6">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold uppercase tracking-widest">Offline Chart Data</h3>
+            <p className="text-xs text-ui-gray leading-relaxed">
+              The built-in development chart used for offline recipe lookups contains manufacturer starting-point times for box speed at 20&nbsp;°C, compiled from manufacturer datasheets and the{' '}
+              <a
+                href="https://www.digitaltruth.com/devchart.php"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-accent-red hover:underline"
+              >
+                Massive Dev Chart (digitaltruth.com) <ExternalLink size={10} />
+              </a>
+              . Times requested at other temperatures or pushed/pulled ratings are scaled with generic compensation factors and flagged as rough estimates — always verify against the current datasheet for your batch.
+            </p>
+          </div>
+        </div>
       </div> : null}
 
       {/* Display */}

@@ -4,10 +4,16 @@ import type { UserSettings } from './userSettings';
 /**
  * Built-in offline development chart.
  *
- * A small, curated set of published manufacturer starting points so the app
- * can still suggest a recipe with no network and no API key. Times are for
- * box speed at the listed temperature. They are STARTING POINTS — the UI must
- * always tell users to verify against the current datasheet for their batch.
+ * A curated set of published manufacturer starting points so the app can
+ * still suggest a recipe with no network and no API key. Times are for box
+ * speed at the listed temperature, compiled from manufacturer datasheets and
+ * cross-checked against the Massive Dev Chart (digitaltruth.com). They are
+ * STARTING POINTS — the UI must always tell users to verify against the
+ * current datasheet for their batch.
+ *
+ * When the requested temperature or EI differs from the chart entry, the
+ * lookup scales the developer time with generic compensation factors
+ * (temperature + push/pull) and flags the recipe as a rough estimate.
  */
 
 export interface DevChartEntry {
@@ -25,6 +31,20 @@ export interface DevChartEntry {
 const CHART_SOURCE = 'Built-in chart (manufacturer starting point)';
 const VERIFY_NOTE = 'Offline starting point — verify against the current datasheet for your batch.';
 
+// Generic compensation factors for off-chart temperatures and pushed/pulled
+// ratings. Temperature scaling follows a Q10-style curve sitting between the
+// published Kodak and Ilford time/temperature charts; push/pull uses per-stop
+// multipliers. Both are clamped to sane ranges and always flagged as rough
+// estimates in the recipe notes.
+const TEMP_Q10 = 2.5;
+const MIN_TEMP_FACTOR = 0.4;
+const MAX_TEMP_FACTOR = 2.5;
+const PUSH_FACTOR_PER_STOP = 1.4;
+const PULL_FACTOR_PER_STOP = 0.8;
+const MAX_PUSH_STOPS = 3;
+const MAX_PULL_STOPS = 2;
+const DEFAULT_CHART_TEMP_C = 20;
+
 // Developer name aliases: queries for any name in a group match entries for
 // the others. D-76 and ID-11 are the classic near-identical formulas.
 const DEVELOPER_ALIASES: string[][] = [
@@ -35,6 +55,13 @@ const DEVELOPER_ALIASES: string[][] = [
   ['ilfosol3', 'ilfosol'],
   ['xtol'],
   ['microphen'],
+];
+
+// Film name aliases: Double-X is sold as CineStill BwXX (Eastman 5222), and
+// T-Max P3200 is often shortened to TMZ.
+const FILM_ALIASES: string[][] = [
+  ['doublex', 'bwxx', '5222'],
+  ['tmaxp3200', 'tmz'],
 ];
 
 export const BW_DEV_CHART: DevChartEntry[] = [
@@ -59,8 +86,31 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   // Ilford Delta 3200 at EI 3200
   { film: 'Delta 3200', developer: 'DD-X', dilution: '1+4', iso: 3200, devSeconds: 570, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Delta 3200', developer: 'Microphen', dilution: 'Stock', iso: 3200, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
-  // Kentmere 400
-  { film: 'Kentmere 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s' },
+  // Ilford Pan F Plus (ISO 50)
+  { film: 'Pan F Plus', developer: 'ID-11', dilution: 'Stock', iso: 50, devSeconds: 390, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Pan F Plus', developer: 'ID-11', dilution: '1+1', iso: 50, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Pan F Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 50, devSeconds: 270, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Pan F Plus', developer: 'Rodinal', dilution: '1+25', iso: 50, devSeconds: 360, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Pan F Plus', developer: 'Rodinal', dilution: '1+50', iso: 50, devSeconds: 660, tempC: 20, agitationMode: 'every-60s' },
+  // Ilford SFX 200 (ISO 200)
+  { film: 'SFX 200', developer: 'ID-11', dilution: 'Stock', iso: 200, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'SFX 200', developer: 'ID-11', dilution: '1+1', iso: 200, devSeconds: 1020, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'SFX 200', developer: 'Ilfosol 3', dilution: '1+9', iso: 200, devSeconds: 360, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'SFX 200', developer: 'Ilfosol 3', dilution: '1+14', iso: 200, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  // Ilford Ortho Plus (ISO 80)
+  { film: 'Ortho Plus', developer: 'ID-11', dilution: 'Stock', iso: 80, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Ortho Plus', developer: 'ID-11', dilution: '1+1', iso: 80, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Ortho Plus', developer: 'Ilfosol 3', dilution: '1+9', iso: 80, devSeconds: 300, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Ortho Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 80, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
+  // Kentmere 100 (ISO 100)
+  { film: 'Kentmere 100', developer: 'ID-11', dilution: 'Stock', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Kentmere 100', developer: 'ID-11', dilution: '1+1', iso: 100, devSeconds: 690, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Kentmere 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  // Kentmere 400 (ISO 400)
+  { film: 'Kentmere 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 570, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Kentmere 400', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 990, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Kentmere 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 450, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Kentmere 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1050, tempC: 20, agitationMode: 'every-60s' },
   // Kodak Tri-X 400
   { film: 'Tri-X 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 405, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Tri-X 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 585, tempC: 20, agitationMode: 'every-60s' },
@@ -73,6 +123,61 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   // Kodak T-Max 400
   { film: 'T-Max 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 465, tempC: 20, agitationMode: 'every-60s' },
   { film: 'T-Max 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
+  // Kodak T-Max P3200 at EI 3200
+  { film: 'T-Max P3200', developer: 'D-76', dilution: 'Stock', iso: 3200, devSeconds: 840, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'T-Max P3200', developer: 'XTOL', dilution: 'Stock', iso: 3200, devSeconds: 810, tempC: 20, agitationMode: 'every-60s' },
+  // Kodak Double-X (ISO 250, also sold as CineStill BwXX)
+  { film: 'Double-X', developer: 'D-76', dilution: 'Stock', iso: 250, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Double-X', developer: 'D-76', dilution: '1+1', iso: 250, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Double-X', developer: 'HC-110', dilution: '1+31', iso: 250, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', note: 'Dilution B.' },
+  { film: 'Double-X', developer: 'Rodinal', dilution: '1+25', iso: 250, devSeconds: 345, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Double-X', developer: 'Rodinal', dilution: '1+50', iso: 250, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  // Fomapan 100 (ISO 100)
+  { film: 'Fomapan 100', developer: 'D-76', dilution: 'Stock', iso: 100, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 100', developer: 'D-76', dilution: '1+1', iso: 100, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 100', developer: 'Rodinal', dilution: '1+50', iso: 100, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
+  // Fomapan 200 (ISO 200)
+  { film: 'Fomapan 200', developer: 'D-76', dilution: 'Stock', iso: 200, devSeconds: 330, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 200', developer: 'D-76', dilution: '1+1', iso: 200, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 200', developer: 'Rodinal', dilution: '1+25', iso: 200, devSeconds: 300, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 200', developer: 'Rodinal', dilution: '1+50', iso: 200, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  // Fomapan 400 (ISO 400)
+  { film: 'Fomapan 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 450, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 330, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Fomapan 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 660, tempC: 20, agitationMode: 'every-60s' },
+  // Bergger Pancro 400 (ISO 400)
+  { film: 'Bergger Pancro 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Bergger Pancro 400', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 1020, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Bergger Pancro 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Bergger Pancro 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1320, tempC: 20, agitationMode: 'every-60s' },
+  // Rollei RPX 100 (ISO 100)
+  { film: 'Rollei RPX 100', developer: 'D-76', dilution: 'Stock', iso: 100, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei RPX 100', developer: 'D-76', dilution: '1+1', iso: 100, devSeconds: 660, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei RPX 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  // Rollei RPX 400 (ISO 400)
+  { film: 'Rollei RPX 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei RPX 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 840, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei RPX 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 720, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei RPX 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1260, tempC: 20, agitationMode: 'every-60s' },
+  // Rollei Retro 80S (ISO 80)
+  { film: 'Rollei Retro 80S', developer: 'Rodinal', dilution: '1+25', iso: 80, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei Retro 80S', developer: 'Rodinal', dilution: '1+50', iso: 80, devSeconds: 840, tempC: 20, agitationMode: 'every-60s' },
+  // Rollei Retro 400S (ISO 400)
+  { film: 'Rollei Retro 400S', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei Retro 400S', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 960, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei Retro 400S', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei Retro 400S', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1320, tempC: 20, agitationMode: 'every-60s' },
+  // AgfaPhoto APX 100 (ISO 100)
+  { film: 'AgfaPhoto APX 100', developer: 'ID-11', dilution: 'Stock', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'AgfaPhoto APX 100', developer: 'ID-11', dilution: '1+1', iso: 100, devSeconds: 690, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'AgfaPhoto APX 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 330, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'AgfaPhoto APX 100', developer: 'Rodinal', dilution: '1+50', iso: 100, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
+  // AgfaPhoto APX 400 (ISO 400)
+  { film: 'AgfaPhoto APX 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 570, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'AgfaPhoto APX 400', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 990, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'AgfaPhoto APX 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 690, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'AgfaPhoto APX 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1260, tempC: 20, agitationMode: 'every-60s' },
 ];
 
 function normalizeName(value: string): string {
@@ -101,14 +206,66 @@ function developerMatches(query: string, entryDeveloper: string): boolean {
 function filmMatches(query: string, entryFilm: string): boolean {
   const q = normalizeName(query);
   const e = normalizeName(entryFilm);
-  return Boolean(q && e && (q === e || q.includes(e) || e.includes(q)));
+
+  if (!q || !e) {
+    return false;
+  }
+
+  if (q === e || q.includes(e) || e.includes(q)) {
+    return true;
+  }
+
+  return FILM_ALIASES.some(
+    (group) =>
+      group.some((alias) => q === alias || q.includes(alias)) &&
+      group.some((alias) => e === alias || e.includes(alias)),
+  );
 }
 
-function buildBwRecipe(entry: DevChartEntry, settings: UserSettings): DevRecipe {
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Generic temperature compensation: time scales by Q10^((chart - target)/10),
+ * i.e. warmer chemistry works faster. Sits between the published Kodak and
+ * Ilford time/temperature curves. Rough estimate only.
+ */
+function temperatureFactor(chartTempC: number, targetTempC: number): number {
+  return clamp(
+    Math.pow(TEMP_Q10, (chartTempC - targetTempC) / 10),
+    MIN_TEMP_FACTOR,
+    MAX_TEMP_FACTOR,
+  );
+}
+
+/**
+ * Generic push/pull compensation: +1 stop ≈ ×1.4, −1 stop ≈ ×0.8, clamped to
+ * +3/−2 stops. Rough estimate only.
+ */
+function exposureFactor(chartIso: number, targetIso: number): number {
+  const stops = Math.log2(targetIso / chartIso);
+  return stops >= 0
+    ? Math.pow(PUSH_FACTOR_PER_STOP, Math.min(stops, MAX_PUSH_STOPS))
+    : Math.pow(PULL_FACTOR_PER_STOP, Math.min(-stops, MAX_PULL_STOPS));
+}
+
+interface RecipeAdjustment {
+  devSeconds: number;
+  iso: number;
+  tempC: number;
+  estimateNote: string;
+}
+
+function buildBwRecipe(
+  entry: DevChartEntry,
+  settings: UserSettings,
+  adjustment?: RecipeAdjustment,
+): DevRecipe {
   const phases: DevPhase[] = [
     {
       name: 'Developer',
-      duration: entry.devSeconds,
+      duration: adjustment?.devSeconds ?? entry.devSeconds,
       agitation: 'Agitate every 1 minute.',
       agitationMode: entry.agitationMode,
     },
@@ -121,11 +278,11 @@ function buildBwRecipe(entry: DevChartEntry, settings: UserSettings): DevRecipe 
     film: entry.film,
     developer: entry.developer,
     dilution: entry.dilution,
-    iso: entry.iso,
-    tempC: entry.tempC,
+    iso: adjustment?.iso ?? entry.iso,
+    tempC: adjustment?.tempC ?? entry.tempC,
     processMode: 'bw',
     phases,
-    notes: [entry.note, VERIFY_NOTE].filter(Boolean).join(' '),
+    notes: [entry.note, adjustment?.estimateNote, VERIFY_NOTE].filter(Boolean).join(' '),
     source: CHART_SOURCE,
   };
 }
@@ -159,6 +316,10 @@ function buildColorRecipes(film: string, iso: number, settings: UserSettings): D
 /**
  * Look up offline starting-point recipes. Stop/fix/wash phases use the user's
  * configured defaults; only the developer time comes from the chart.
+ *
+ * When the requested `iso` or `tempC` differs from the chart entry (box speed,
+ * 20 °C), the developer time is scaled with generic compensation factors and
+ * the recipe notes flag it as a rough estimate to verify before use.
  */
 export function findDevChartRecipes(
   film: string,
@@ -167,6 +328,7 @@ export function findDevChartRecipes(
   iso: number,
   processMode: ProcessMode,
   settings: UserSettings,
+  tempC: number = DEFAULT_CHART_TEMP_C,
 ): DevRecipe[] {
   if (processMode === 'color') {
     const dev = normalizeName(developer);
@@ -192,5 +354,34 @@ export function findDevChartRecipes(
     : [];
   const selected = dilutionMatches.length > 0 ? dilutionMatches : matches;
 
-  return selected.map((entry) => buildBwRecipe(entry, settings));
+  const targetIso = Number.isFinite(iso) && iso > 0 ? iso : undefined;
+  const targetTempC = Number.isFinite(tempC) && tempC > 0 ? tempC : DEFAULT_CHART_TEMP_C;
+
+  return selected.map((entry) => {
+    const adjustIso = targetIso !== undefined && targetIso !== entry.iso;
+    const adjustTemp = targetTempC !== entry.tempC;
+
+    if (!adjustIso && !adjustTemp) {
+      return buildBwRecipe(entry, settings);
+    }
+
+    const factor =
+      (adjustTemp ? temperatureFactor(entry.tempC, targetTempC) : 1) *
+      (adjustIso ? exposureFactor(entry.iso, targetIso) : 1);
+
+    const parts: string[] = [];
+    if (adjustIso) {
+      parts.push(`ISO ${entry.iso} → ${targetIso}`);
+    }
+    if (adjustTemp) {
+      parts.push(`${entry.tempC}°C → ${targetTempC}°C`);
+    }
+
+    return buildBwRecipe(entry, settings, {
+      devSeconds: Math.round(entry.devSeconds * factor),
+      iso: targetIso ?? entry.iso,
+      tempC: targetTempC,
+      estimateNote: `Rough estimate (${parts.join(', ')}) — developer time scaled with generic compensation factors. Treat with caution and verify before committing chemistry.`,
+    });
+  });
 }

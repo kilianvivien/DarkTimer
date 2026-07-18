@@ -282,6 +282,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
       query.iso,
       query.processMode,
       settings,
+      query.tempC,
     );
 
     if (chartOptions.length === 0) {

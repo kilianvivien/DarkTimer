@@ -57,4 +57,75 @@ describe('devChart', () => {
     expect(findDevChartRecipes('Mystery Film', 'Mystery Dev', '', 100, 'bw', DEFAULT_SETTINGS)).toEqual([]);
     expect(findDevChartRecipes('Provia 100F', 'E-6', '', 100, 'color', DEFAULT_SETTINGS)).toEqual([]);
   });
+
+  it('covers newly added popular stocks at box speed without an estimate note', () => {
+    const [fomapan] = findDevChartRecipes('Fomapan 400', 'D-76', 'Stock', 400, 'bw', DEFAULT_SETTINGS);
+    expect(fomapan.phases[0].duration).toBe(450);
+    expect(fomapan.notes).not.toMatch(/rough estimate/i);
+
+    const [panF] = findDevChartRecipes('Pan F Plus', 'Ilfosol 3', '', 50, 'bw', DEFAULT_SETTINGS);
+    expect(panF.dilution).toBe('1+14');
+    expect(panF.phases[0].duration).toBe(270);
+
+    const [p3200] = findDevChartRecipes('T-Max P3200', 'D-76', 'Stock', 3200, 'bw', DEFAULT_SETTINGS);
+    expect(p3200.phases[0].duration).toBe(840);
+  });
+
+  it('matches film aliases like CineStill BwXX for Double-X entries', () => {
+    const recipes = findDevChartRecipes('CineStill BwXX', 'HC-110', '', 250, 'bw', DEFAULT_SETTINGS);
+
+    expect(recipes).toHaveLength(1);
+    expect(recipes[0].film).toBe('Double-X');
+    expect(recipes[0].phases[0].duration).toBe(360);
+  });
+
+  it('shortens the developer time for warmer chemistry and flags it as an estimate', () => {
+    const [recipe] = findDevChartRecipes('HP5 Plus', 'ID-11', 'Stock', 400, 'bw', DEFAULT_SETTINGS, 24);
+
+    expect(recipe.tempC).toBe(24);
+    expect(recipe.phases[0].duration).toBe(312);
+    expect(recipe.phases[0].duration).toBeLessThan(450);
+    expect(recipe.notes).toMatch(/rough estimate/i);
+    expect(recipe.notes).toMatch(/20°C → 24°C/);
+  });
+
+  it('lengthens the developer time for colder chemistry', () => {
+    const [recipe] = findDevChartRecipes('HP5 Plus', 'ID-11', 'Stock', 400, 'bw', DEFAULT_SETTINGS, 18);
+
+    expect(recipe.phases[0].duration).toBe(541);
+    expect(recipe.phases[0].duration).toBeGreaterThan(450);
+    expect(recipe.notes).toMatch(/rough estimate/i);
+  });
+
+  it('scales the developer time for pushed ratings', () => {
+    const [pushed] = findDevChartRecipes('HP5 Plus', 'ID-11', 'Stock', 800, 'bw', DEFAULT_SETTINGS);
+
+    expect(pushed.iso).toBe(800);
+    expect(pushed.phases[0].duration).toBe(630);
+    expect(pushed.notes).toMatch(/rough estimate/i);
+    expect(pushed.notes).toMatch(/ISO 400 → 800/);
+  });
+
+  it('scales the developer time for pulled ratings', () => {
+    const [pulled] = findDevChartRecipes('HP5 Plus', 'ID-11', 'Stock', 200, 'bw', DEFAULT_SETTINGS);
+
+    expect(pulled.phases[0].duration).toBe(360);
+    expect(pulled.notes).toMatch(/rough estimate/i);
+  });
+
+  it('clamps extreme push and pull adjustments', () => {
+    const [bigPush] = findDevChartRecipes('HP5 Plus', 'ID-11', 'Stock', 6400, 'bw', DEFAULT_SETTINGS);
+    expect(bigPush.phases[0].duration).toBe(1235);
+
+    const [bigPull] = findDevChartRecipes('HP5 Plus', 'ID-11', 'Stock', 25, 'bw', DEFAULT_SETTINGS);
+    expect(bigPull.phases[0].duration).toBe(288);
+  });
+
+  it('combines temperature and exposure adjustments', () => {
+    const [recipe] = findDevChartRecipes('HP5 Plus', 'ID-11', 'Stock', 800, 'bw', DEFAULT_SETTINGS, 24);
+
+    expect(recipe.phases[0].duration).toBe(437);
+    expect(recipe.notes).toMatch(/ISO 400 → 800/);
+    expect(recipe.notes).toMatch(/20°C → 24°C/);
+  });
 });

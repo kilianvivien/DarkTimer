@@ -17,10 +17,11 @@ export const FILM_STOCK_OPTIONS: SearchableOption[] = [
   { value: 'Delta 100', label: 'Delta 100', keywords: ['ilford'], processModes: ['bw'], iso: 100 },
   { value: 'Delta 400', label: 'Delta 400', keywords: ['ilford'], processModes: ['bw'], iso: 400 },
   { value: 'Delta 3200', label: 'Delta 3200', keywords: ['ilford'], processModes: ['bw'], iso: 3200 },
+  { value: 'Pan F Plus', label: 'Pan F Plus', keywords: ['panf', 'pan f', 'ilford'], processModes: ['bw'], iso: 50 },
   { value: 'Kentmere 100', label: 'Kentmere 100', keywords: ['kentmere', 'ilford'], processModes: ['bw'], iso: 100 },
   { value: 'Kentmere 400', label: 'Kentmere 400', keywords: ['kentmere', 'ilford'], processModes: ['bw'], iso: 400 },
   { value: 'SFX 200', label: 'SFX 200', keywords: ['sfx', 'infrared', 'ilford'], processModes: ['bw'], iso: 200 },
-  { value: 'Ortho Plus', label: 'Ortho Plus', keywords: ['ortho', 'ilford'], processModes: ['bw'] },
+  { value: 'Ortho Plus', label: 'Ortho Plus', keywords: ['ortho', 'ilford'], processModes: ['bw'], iso: 80 },
   // Black & White — Kodak
   { value: 'Tri-X 400', label: 'Tri-X 400', keywords: ['trix', 'kodak'], processModes: ['bw'], iso: 400 },
   { value: 'T-Max 100', label: 'T-Max 100', keywords: ['tmax', 'kodak'], processModes: ['bw'], iso: 100 },
@@ -36,7 +37,10 @@ export const FILM_STOCK_OPTIONS: SearchableOption[] = [
   // Black & White — Rollei / Agfa / Adox
   { value: 'Rollei RPX 100', label: 'Rollei RPX 100', keywords: ['rollei', 'rpx'], processModes: ['bw'], iso: 100 },
   { value: 'Rollei RPX 400', label: 'Rollei RPX 400', keywords: ['rollei', 'rpx'], processModes: ['bw'], iso: 400 },
+  { value: 'Rollei Retro 80S', label: 'Rollei Retro 80S', keywords: ['rollei', 'retro'], processModes: ['bw'], iso: 80 },
   { value: 'Rollei Retro 400S', label: 'Rollei Retro 400S', keywords: ['rollei', 'retro'], processModes: ['bw'], iso: 400 },
+  { value: 'AgfaPhoto APX 100', label: 'AgfaPhoto APX 100', keywords: ['agfa', 'agfaphoto', 'apx'], processModes: ['bw'], iso: 100 },
+  { value: 'AgfaPhoto APX 400', label: 'AgfaPhoto APX 400', keywords: ['agfa', 'agfaphoto', 'apx'], processModes: ['bw'], iso: 400 },
   { value: 'Adox HR-50', label: 'Adox HR-50', keywords: ['adox', 'hr50'], processModes: ['bw'], iso: 50 },
   { value: 'Adox CMS 20 II', label: 'Adox CMS 20 II', keywords: ['adox', 'cms20'], processModes: ['bw'], iso: 25 },
   // Black & White — Bergger / JCH / Kosmo / Lomography
