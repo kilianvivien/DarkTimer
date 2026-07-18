@@ -34,7 +34,7 @@ export const PresetLibrary: React.FC<PresetLibraryProps> = ({
   };
 
   return (
-    <section aria-label="Preset library" className="w-full max-w-2xl space-y-4">
+    <section aria-label="Preset library" className="w-full max-w-2xl lg:max-w-5xl space-y-4">
       {presets.length === 0 ? (
         <EmptyState
           icon={Clock}
@@ -43,7 +43,7 @@ export const PresetLibrary: React.FC<PresetLibraryProps> = ({
           className="max-w-2xl"
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
           <AnimatePresence>
             {presets.map((preset) => (
               <motion.article

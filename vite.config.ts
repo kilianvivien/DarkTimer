@@ -46,16 +46,44 @@ export default defineConfig(() => {
       VitePWA({
         injectRegister: false,
         registerType: 'prompt',
-        includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-512x512.png'],
+        includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-192x192.png', 'maskable-512x512.png'],
         manifest: {
+          id: '/',
           name: 'DarkTimer',
           short_name: 'DarkTimer',
           description: 'A utilitarian darkroom timer for analog film development.',
+          lang: 'en',
+          categories: ['utilities', 'photo'],
           theme_color: '#000000',
           background_color: '#000000',
           display: 'standalone',
+          display_override: ['standalone', 'minimal-ui'],
           scope: '/',
           start_url: '/',
+          launch_handler: {
+            client_mode: 'navigate-existing',
+          },
+          handle_links: 'preferred',
+          shortcuts: [
+            {
+              name: 'New Timer',
+              short_name: 'Timer',
+              url: '/?view=manual',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+            },
+            {
+              name: 'AI Recipe Search',
+              short_name: 'AI Search',
+              url: '/?view=ai',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+            },
+            {
+              name: 'Library',
+              short_name: 'Library',
+              url: '/?view=library',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+            },
+          ],
           icons: [
             {
               src: '/pwa-192x192.png',
@@ -70,6 +98,12 @@ export default defineConfig(() => {
               purpose: 'any',
             },
             {
+              src: '/maskable-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+            {
               src: '/maskable-512x512.png',
               sizes: '512x512',
               type: 'image/png',
@@ -80,6 +114,9 @@ export default defineConfig(() => {
         workbox: {
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+          // iOS fetches launch images itself at install time; precaching all
+          // 36 of them would double the SW payload for every platform.
+          globIgnores: ['**/splash/**'],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/generativelanguage\.googleapis\.com\/.*/i,

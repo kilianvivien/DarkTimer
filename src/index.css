@@ -17,9 +17,18 @@
     -webkit-text-size-adjust: 100%;
   }
 
-  html {
-    background: var(--color-dark-bg);
-    min-height: 100%;
+  /*
+   * Darkroom safelight mode: everything renders as deep red on pure black to
+   * preserve night vision next to an enlarger. Tailwind v4 utilities resolve
+   * colors through these variables, so overriding them re-skins every view,
+   * including `text-white`, `bg-white`, and their opacity variants.
+   */
+  :root[data-theme="safelight"] {
+    --color-white: #ff2b2b;
+    --color-ui-gray: #991f1f;
+    --color-dark-panel: #0a0202;
+    --color-dark-border: #2b0808;
+    --color-accent-red: #ff1a1a;
   }
 
   html {
@@ -44,6 +53,11 @@
   button, [role="button"] {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /* Remove the 300ms tap delay on every interactive element, not just styled buttons */
+  a, button, input, select, textarea, label, [role="button"] {
+    touch-action: manipulation;
   }
 
   a:focus-visible,

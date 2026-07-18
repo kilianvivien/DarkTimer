@@ -14,6 +14,7 @@ export type InstallPlatform =
 
 export interface PwaUpdateState {
   needRefresh: boolean;
+  offlineReady: boolean;
   isUpdating: boolean;
   isOnline: boolean;
   isStandalone: boolean;
@@ -33,6 +34,8 @@ export interface InstallInstructions {
 }
 
 const INSTALL_DISMISS_KEY = 'darktimer_pwa_install_dismissed';
+const INSTALL_DISMISS_BACKOFF_MS = 14 * 24 * 60 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const listeners = new Set<() => void>();
 
 let initialized = false;
@@ -40,6 +43,7 @@ let updateServiceWorker: ((reloadPage?: boolean) => Promise<void>) | undefined;
 let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
 let state: PwaUpdateState = {
   needRefresh: false,
+  offlineReady: false,
   isUpdating: false,
   isOnline: true,
   isStandalone: false,
@@ -98,16 +102,45 @@ function readInstallDismissed(): boolean {
     return false;
   }
 
-  return localStorage.getItem(INSTALL_DISMISS_KEY) === '1';
+  const raw = localStorage.getItem(INSTALL_DISMISS_KEY);
+
+  if (!raw) {
+    return false;
+  }
+
+  // The app is installed (or the user accepted the prompt) — never re-ask.
+  if (raw === 'installed') {
+    return true;
+  }
+
+  // Timestamped dismissals expire after a backoff window instead of silencing
+  // the install prompt forever. Legacy '1' values parse to an expired timestamp.
+  const dismissedAt = Number(raw);
+  if (!Number.isFinite(dismissedAt)) {
+    return false;
+  }
+
+  return Date.now() - dismissedAt < INSTALL_DISMISS_BACKOFF_MS;
 }
 
-function writeInstallDismissed(value: boolean): void {
+function markInstallDismissed(): void {
   if (typeof localStorage === 'undefined') {
     return;
   }
 
-  if (value) {
-    localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+  localStorage.setItem(INSTALL_DISMISS_KEY, String(Date.now()));
+}
+
+function markInstallCompleted(): void {
+  if (typeof localStorage === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem(INSTALL_DISMISS_KEY, 'installed');
+}
+
+function clearInstallDismissed(): void {
+  if (typeof localStorage === 'undefined') {
     return;
   }
 
@@ -169,12 +202,33 @@ export function initializePwaUpdates(): void {
   syncDerivedState();
 
   updateServiceWorker = registerSW({
-    immediate: true,
+    // Register after the window load event: on a fresh install the SW's
+    // ~1 MB precache run would otherwise compete with the page's own
+    // critical requests and stretch the first launch.
+    immediate: false,
     onNeedRefresh() {
       setState({
         needRefresh: true,
         isUpdating: false,
       });
+    },
+    onOfflineReady() {
+      setState({ offlineReady: true });
+    },
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) {
+        return;
+      }
+
+      // With registerType: 'prompt' the SW only checks for updates on page load.
+      // Darkroom sessions keep the app open for hours, so poll periodically too.
+      window.setInterval(() => {
+        if (navigator.onLine) {
+          void registration.update().catch(() => {
+            // A failed background check is fine; the next load will retry.
+          });
+        }
+      }, UPDATE_CHECK_INTERVAL_MS);
     },
     onRegisterError(error) {
       console.error('Failed to register DarkTimer service worker:', error);
@@ -185,13 +239,12 @@ export function initializePwaUpdates(): void {
   window.addEventListener('offline', syncDerivedState);
   window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    writeInstallDismissed(true);
+    markInstallCompleted();
     syncDerivedState();
   });
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     deferredInstallPrompt = event as BeforeInstallPromptEvent;
-    writeInstallDismissed(false);
     syncDerivedState();
   });
 }
@@ -216,8 +269,16 @@ export function dismissPwaUpdatePrompt(): void {
   setState({ needRefresh: false });
 }
 
+export function dismissPwaOfflineReady(): void {
+  if (!state.offlineReady) {
+    return;
+  }
+
+  setState({ offlineReady: false });
+}
+
 export function dismissPwaInstallPrompt(): void {
-  writeInstallDismissed(true);
+  markInstallDismissed();
   syncDerivedState();
 }
 
@@ -233,7 +294,7 @@ export async function requestPwaInstall(): Promise<'accepted' | 'dismissed' | 'u
   const result = await prompt.userChoice;
 
   if (result.outcome === 'accepted') {
-    writeInstallDismissed(true);
+    markInstallCompleted();
   }
 
   syncDerivedState();
@@ -270,7 +331,8 @@ export function getInstallInstructions(platform: InstallPlatform): InstallInstru
           },
           {
             cue: 'Home Screen',
-            detail: 'Launch DarkTimer from your Home Screen like a normal app.',
+            detail:
+              'Launch DarkTimer from your Home Screen like a normal app. Note: the installed app keeps its own storage, so recipes saved in the Safari tab do not carry over.',
             icon: 'home',
           },
         ],
@@ -351,6 +413,7 @@ export function __resetPwaStateForTests(): void {
   deferredInstallPrompt = null;
   state = {
     needRefresh: false,
+    offlineReady: false,
     isUpdating: false,
     isOnline: true,
     isStandalone: false,
@@ -358,7 +421,7 @@ export function __resetPwaStateForTests(): void {
     isInstallDismissed: false,
     installPlatform: 'unsupported',
   };
-  writeInstallDismissed(false);
+  clearInstallDismissed();
   listeners.clear();
   initialized = false;
   updateServiceWorker = undefined;

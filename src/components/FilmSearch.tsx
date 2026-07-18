@@ -18,6 +18,7 @@ import {
 } from '../services/searchCatalog';
 import { SearchableField } from './SearchableField';
 import { getCachedAiRecipe, saveCachedAiRecipe } from '../services/storage';
+import { findDevChartRecipes } from '../services/devChart';
 
 interface FilmSearchProps {
   apiKeys: Record<AIProvider, string>;
@@ -181,6 +182,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DevResponse | null>(null);
   const [resultProvider, setResultProvider] = useState<AIProvider | null>(null);
+  const [resultSource, setResultSource] = useState<'ai' | 'cache' | 'chart' | null>(null);
   const [searchError, setSearchError] = useState<SearchErrorState | null>(null);
   const [showMissingKeyWarning, setShowMissingKeyWarning] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -244,11 +246,33 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
     setSearchError(null);
     setResults(null);
     setResultProvider(null);
+    setResultSource(null);
     setShowMissingKeyWarning(false);
 
     if (!preserveSearchedState) {
       setHasSearched(false);
     }
+  };
+
+  const tryChartLookup = (query: SearchQuery): boolean => {
+    const chartOptions = findDevChartRecipes(
+      query.film,
+      query.developer,
+      query.dilution,
+      query.iso,
+      query.processMode,
+      settings,
+    );
+
+    if (chartOptions.length === 0) {
+      return false;
+    }
+
+    setResults({ options: chartOptions, confidence: 'chart' });
+    setResultProvider(null);
+    setResultSource('chart');
+    setHasSearched(true);
+    return true;
   };
 
   const executeSearch = async (
@@ -270,7 +294,23 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
 
     resetSearchUi(preserveSearchedState);
 
+    if (!normalizedQuery.film || !normalizedQuery.developer) {
+      setSearchError({
+        code: 'validation',
+        provider: nextProvider,
+        retryable: false,
+        title: 'Add a film and developer',
+        message: 'Enter at least a film stock and developer before asking AI.',
+      });
+      return;
+    }
+
     if (!apiKey) {
+      // No key: still useful — fall back to the built-in offline chart.
+      if (tryChartLookup(normalizedQuery)) {
+        return;
+      }
+
       if (showKeyWarning) {
         setShowMissingKeyWarning(true);
         setSearchError({
@@ -288,24 +328,18 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
       return;
     }
 
-    if (!normalizedQuery.film || !normalizedQuery.developer) {
-      setSearchError({
-        code: 'validation',
-        provider: nextProvider,
-        retryable: false,
-        title: 'Add a film and developer',
-        message: 'Enter at least a film stock and developer before asking AI.',
-      });
-      return;
-    }
-
     if (isOffline) {
       const cached = await getCachedAiRecipe(buildAiCacheKey(nextProvider, normalizedQuery));
 
       if (cached) {
         setResults(cached);
         setResultProvider(nextProvider);
+        setResultSource('cache');
         setHasSearched(true);
+        return;
+      }
+
+      if (tryChartLookup(normalizedQuery)) {
         return;
       }
 
@@ -340,6 +374,7 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
 
       setResults(response);
       setResultProvider(nextProvider);
+      setResultSource('ai');
       await saveCachedAiRecipe(buildAiCacheKey(nextProvider, normalizedQuery), response);
     } catch (error) {
       if (requestId !== latestRequestIdRef.current) {
@@ -350,6 +385,15 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
       if (fallback && error instanceof AIRecipeError && (error.code === 'network' || error.code === 'offline' || error.code === 'unavailable')) {
         setResults(fallback);
         setResultProvider(nextProvider);
+        setResultSource('cache');
+        return;
+      }
+
+      if (
+        error instanceof AIRecipeError &&
+        (error.code === 'network' || error.code === 'offline' || error.code === 'unavailable') &&
+        tryChartLookup(normalizedQuery)
+      ) {
         return;
       }
 
@@ -618,17 +662,17 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="submit"
-              disabled={loading || isOffline || !film.trim() || !developer.trim()}
+              disabled={loading || !film.trim() || !developer.trim()}
               className="flex-1 utilitarian-button bg-white text-black font-bold py-4 hover:bg-accent-red hover:text-white hover:border-accent-red flex items-center justify-center space-x-2 disabled:opacity-50"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              <span>Ask AI</span>
+              <span>{isOffline ? 'Search Offline' : 'Ask AI'}</span>
             </button>
           </div>
 
           {isOffline ? (
             <p className="text-[10px] font-mono text-ui-gray text-center">
-              You&apos;re offline. Manual mode, presets, and timers still work, but AI lookup is unavailable.
+              You&apos;re offline. Search uses cached AI results and the built-in development chart instead of a live lookup.
             </p>
           ) : null}
         </div>
@@ -729,10 +773,21 @@ export const FilmSearch: React.FC<FilmSearchProps> = ({
             <div className="space-y-1">
               <p className="mono-label text-accent-red">Recipe candidates</p>
               <p className="text-sm text-ui-gray">
-                {(resultProvider ? PROVIDER_LABELS[resultProvider] : PROVIDER_LABELS[provider])} found {results.options.length} option{results.options.length === 1 ? '' : 's'}.
+                {resultSource === 'chart'
+                  ? `Built-in chart found ${results.options.length} starting point${results.options.length === 1 ? '' : 's'}.`
+                  : `${resultProvider ? PROVIDER_LABELS[resultProvider] : PROVIDER_LABELS[provider]} found ${results.options.length} option${results.options.length === 1 ? '' : 's'}.`}
               </p>
+              {resultSource === 'cache' ? (
+                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-accent-red">
+                  From cache — may be stale
+                </p>
+              ) : null}
             </div>
-            {results.confidence ? (
+            {resultSource === 'chart' ? (
+              <span className="border border-dark-border px-3 py-2 text-[10px] font-mono uppercase tracking-[0.18em] text-ui-gray">
+                Offline chart
+              </span>
+            ) : results.confidence ? (
               <span className="border border-dark-border px-3 py-2 text-[10px] font-mono uppercase tracking-[0.18em] text-ui-gray">
                 Confidence {results.confidence}
               </span>

@@ -1,9 +1,11 @@
-import React, { useEffect, useId, useState } from 'react';
-import { Save, Eye, EyeOff, ExternalLink, Shield, Bell } from 'lucide-react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { Save, Eye, EyeOff, ExternalLink, Shield, Bell, Lamp, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   AIProvider,
+  AgitationFlashMode,
   ApiKeyPersistenceMode,
+  AppTheme,
   PhaseCountdown,
   UserSettings,
 } from '../services/settings';
@@ -211,6 +213,34 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   const [unlockError, setUnlockError] = useState('');
   const [historyError, setHistoryError] = useState('');
   const vibrationSupported = typeof navigator !== 'undefined' && 'vibrate' in navigator;
+  const testAudioContextRef = useRef<AudioContext | null>(null);
+
+  const playTestBeep = () => {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioCtx) {
+      return;
+    }
+
+    const ctx = testAudioContextRef.current ?? new AudioCtx();
+    testAudioContextRef.current = ctx;
+
+    void ctx.resume().then(() => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      // Same gain mapping the timer uses for its cues.
+      gain.gain.setValueAtTime(0.02 + settings.cueVolume * 0.28, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    });
+  };
 
   useEffect(() => {
     setSettings(initialSettings);
@@ -504,6 +534,56 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             onToggle={() => handleChange('yoloRun', !settings.yoloRun)}
           />
         </div>
+      </div>
+
+      {/* Display */}
+      <div className="utilitarian-border bg-dark-panel p-5 md:p-8 space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold uppercase tracking-tight">Display</h2>
+          <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
+            Theme for working next to light-sensitive material
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {([
+            {
+              value: 'dark' as AppTheme,
+              title: 'Standard',
+              description: 'White text on black. Bright and readable in normal light.',
+            },
+            {
+              value: 'safelight' as AppTheme,
+              title: 'Safelight',
+              description: 'Deep red on pure black. Preserves night vision and protects paper in the darkroom.',
+            },
+          ]).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleChange('theme', option.value)}
+              className={`press-feedback text-left border p-4 transition-colors ${
+                settings.theme === option.value
+                  ? 'border-white bg-white text-black'
+                  : 'border-dark-border text-white hover:border-white/40'
+              }`}
+              aria-pressed={settings.theme === option.value}
+            >
+              <p className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.2em]">
+                <Lamp size={13} />
+                {option.title}
+              </p>
+              <p className={`mt-2 text-xs leading-relaxed ${
+                settings.theme === option.value ? 'text-black/75' : 'text-ui-gray'
+              }`}>
+                {option.description}
+              </p>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-ui-gray font-mono">
+          You can also flip themes anytime with the lamp icon in the header or the timer controls.
+        </p>
       </div>
 
       {/* AI settings */}
@@ -845,20 +925,79 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             )}
 
             <div className="space-y-3 border-t border-dark-border pt-4">
-              <p className="text-sm font-bold uppercase tracking-widest">Agitation cues</p>
-              <PreferenceToggle
-                checked={settings.agitationFlashEnabled}
-                label="Flash overlay"
-                description="Pulse the active timer with a restrained red flash during agitation windows."
-                onToggle={() => handleChange('agitationFlashEnabled', !settings.agitationFlashEnabled)}
-              />
+              <p className="text-sm font-bold uppercase tracking-widest">Timer cues</p>
+
+              <div className="border border-dark-border p-4 space-y-3">
+                <div className="space-y-1">
+                  <p className="mono-label text-white">Cue volume</p>
+                  <p className="text-xs text-ui-gray leading-relaxed">
+                    Loudness of the agitation and phase-end beeps. Turn it up for rooms with running water or fans.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={Math.round(settings.cueVolume * 100)}
+                    onChange={(event) => handleChange('cueVolume', Number(event.target.value) / 100)}
+                    className="w-full accent-accent-red"
+                    aria-label="Cue volume"
+                  />
+                  <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-ui-gray">
+                    {Math.round(settings.cueVolume * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={playTestBeep}
+                    className="utilitarian-button flex h-11 w-11 min-w-0 shrink-0 items-center justify-center px-0 py-0"
+                    aria-label="Play test beep"
+                  >
+                    <Volume2 size={15} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="border border-dark-border p-4 space-y-3">
+                <div className="space-y-1">
+                  <p className="mono-label text-white">Agitation flash</p>
+                  <p className="text-xs text-ui-gray leading-relaxed">
+                    Border pulse keeps the cue visible without lighting up the whole screen — easier on photosensitive eyes.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 border border-dark-border">
+                  {([
+                    { value: 'full', label: 'Full flash' },
+                    { value: 'border', label: 'Border' },
+                    { value: 'off', label: 'Off' },
+                  ] as { value: AgitationFlashMode; label: string }[]).map((option, i) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleChange('agitationFlashMode', option.value)}
+                      className={`press-feedback px-2 py-3 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors ${
+                        i < 2 ? 'border-r border-dark-border' : ''
+                      } ${
+                        settings.agitationFlashMode === option.value
+                          ? 'bg-white text-black'
+                          : 'text-ui-gray hover:text-white hover:bg-[#0f0f0f]'
+                      }`}
+                      aria-pressed={settings.agitationFlashMode === option.value}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <PreferenceToggle
                 checked={settings.agitationVibrationEnabled}
                 disabled={!vibrationSupported}
                 label="Vibration cues"
                 description={
                   vibrationSupported
-                    ? 'Use a short double pulse when agitation starts on supported mobile browsers.'
+                    ? 'Short double pulse for agitation, one long pulse for phase-end — tell them apart by feel alone.'
                     : 'Vibration is not supported on this device or browser.'
                 }
                 onToggle={() => handleChange('agitationVibrationEnabled', !settings.agitationVibrationEnabled)}

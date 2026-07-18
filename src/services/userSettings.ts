@@ -4,6 +4,8 @@ export type AIProvider = 'gemini' | 'mistral';
 export type ApiKeyPersistenceMode = 'session' | 'encrypted';
 
 export type PhaseCountdown = 0 | 5 | 10;
+export type AppTheme = 'dark' | 'safelight';
+export type AgitationFlashMode = 'full' | 'border' | 'off';
 
 export interface UserSettings {
   defaultBwDeveloper: number;
@@ -20,7 +22,10 @@ export interface UserSettings {
   apiKeyPersistenceMode: ApiKeyPersistenceMode;
   phaseCountdown: PhaseCountdown;
   yoloRun: boolean;
-  agitationFlashEnabled: boolean;
+  theme: AppTheme;
+  /** Beep loudness, 0–1. Mapped to Web Audio gain in the timer. */
+  cueVolume: number;
+  agitationFlashMode: AgitationFlashMode;
   agitationVibrationEnabled: boolean;
   autoTrackChemRolls: boolean;
 }
@@ -43,7 +48,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   apiKeyPersistenceMode: 'session',
   phaseCountdown: 10,
   yoloRun: false,
-  agitationFlashEnabled: true,
+  theme: 'dark',
+  cueVolume: 0.5,
+  agitationFlashMode: 'full',
   agitationVibrationEnabled: false,
   autoTrackChemRolls: false,
 };
@@ -60,14 +67,40 @@ export function normalizeAIProvider(value: unknown): AIProvider {
   return value === 'mistral' ? 'mistral' : 'gemini';
 }
 
+export function normalizeAppTheme(value: unknown): AppTheme {
+  return value === 'safelight' ? 'safelight' : 'dark';
+}
+
+function normalizeAgitationFlashMode(value: unknown, legacyEnabled: unknown): AgitationFlashMode {
+  if (value === 'full' || value === 'border' || value === 'off') {
+    return value;
+  }
+
+  // Migrate the pre-existing boolean setting.
+  if (typeof legacyEnabled === 'boolean') {
+    return legacyEnabled ? 'full' : 'off';
+  }
+
+  return DEFAULT_SETTINGS.agitationFlashMode;
+}
+
+function normalizeCueVolume(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.cueVolume;
+  }
+
+  return Math.min(1, Math.max(0, value));
+}
+
 export function normalizeApiKeyPersistenceMode(value: unknown): ApiKeyPersistenceMode {
   return value === 'encrypted' ? 'encrypted' : 'session';
 }
 
 export function normalizeSettings(value: unknown): UserSettings {
+  const raw = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
   const parsed = {
     ...DEFAULT_SETTINGS,
-    ...(typeof value === 'object' && value !== null ? value : {}),
+    ...raw,
   } as Record<string, unknown>;
 
   return {
@@ -90,10 +123,14 @@ export function normalizeSettings(value: unknown): UserSettings {
       typeof parsed.yoloRun === 'boolean'
         ? parsed.yoloRun
         : DEFAULT_SETTINGS.yoloRun,
-    agitationFlashEnabled:
-      typeof parsed.agitationFlashEnabled === 'boolean'
-        ? parsed.agitationFlashEnabled
-        : DEFAULT_SETTINGS.agitationFlashEnabled,
+    theme: normalizeAppTheme(parsed.theme),
+    cueVolume: normalizeCueVolume(parsed.cueVolume),
+    // Read the raw values here: merging defaults first would mask the legacy
+    // agitationFlashEnabled boolean with the default flash mode.
+    agitationFlashMode: normalizeAgitationFlashMode(
+      raw.agitationFlashMode,
+      raw.agitationFlashEnabled,
+    ),
     agitationVibrationEnabled:
       typeof parsed.agitationVibrationEnabled === 'boolean'
         ? parsed.agitationVibrationEnabled

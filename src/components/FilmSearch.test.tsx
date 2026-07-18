@@ -71,10 +71,26 @@ describe('FilmSearch', () => {
       apiKeys: { gemini: '', mistral: '' },
     });
 
-    await fillCoreFields(user, 'Tri-X 400', 'Rodinal');
+    // A combination the built-in chart does not cover.
+    await fillCoreFields(user, 'JCH StreetPan 400', 'Diafine');
     await user.click(screen.getByRole('button', { name: /ask ai/i }));
 
     expect(screen.getByText('Gemini or Mistral API key required')).toBeInTheDocument();
+    expect(getDevTimesMock).not.toHaveBeenCalled();
+  });
+
+  it('serves built-in chart starting points when no API key is set', async () => {
+    const user = userEvent.setup();
+
+    renderFilmSearch({
+      apiKeys: { gemini: '', mistral: '' },
+    });
+
+    await fillCoreFields(user, 'Tri-X 400', 'Rodinal');
+    await user.click(screen.getByRole('button', { name: /ask ai/i }));
+
+    expect(await screen.findByText(/built-in chart found/i)).toBeInTheDocument();
+    expect(screen.queryByText('Gemini or Mistral API key required')).not.toBeInTheDocument();
     expect(getDevTimesMock).not.toHaveBeenCalled();
   });
 
@@ -84,13 +100,27 @@ describe('FilmSearch', () => {
     expect(screen.getByRole('button', { name: /ask ai/i })).toBeDisabled();
   });
 
-  it('reflects offline state without attempting a lookup', () => {
+  it('reflects offline state and offers offline search instead', () => {
     setOnlineStatus(false);
 
     renderFilmSearch();
 
     expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ask ai/i })).toBeDisabled();
+    // Still disabled while the form is empty, but relabeled for offline search.
+    expect(screen.getByRole('button', { name: /search offline/i })).toBeDisabled();
+  });
+
+  it('serves built-in chart results while offline without calling AI', async () => {
+    setOnlineStatus(false);
+    const user = userEvent.setup();
+
+    renderFilmSearch();
+
+    await fillCoreFields(user, 'HP5 Plus', 'ID-11');
+    await user.click(screen.getByRole('button', { name: /search offline/i }));
+
+    expect(await screen.findByText(/built-in chart found/i)).toBeInTheDocument();
+    expect(getDevTimesMock).not.toHaveBeenCalled();
   });
 
   it('renders searchable inputs with shared manual-form styling', () => {

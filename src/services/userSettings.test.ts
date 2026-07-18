@@ -4,6 +4,7 @@ import {
   getDefaultTemperatureForMode,
   normalizeAIProvider,
   normalizeApiKeyPersistenceMode,
+  normalizeAppTheme,
   normalizeSettings,
 } from './userSettings';
 
@@ -15,7 +16,9 @@ describe('userSettings helpers', () => {
       apiKeyPersistenceMode: 'encrypted',
       phaseCountdown: 5,
       yoloRun: true,
-      agitationFlashEnabled: false,
+      theme: 'safelight',
+      cueVolume: 0.8,
+      agitationFlashMode: 'border',
       agitationVibrationEnabled: true,
     });
 
@@ -26,7 +29,9 @@ describe('userSettings helpers', () => {
       apiKeyPersistenceMode: 'encrypted',
       phaseCountdown: 5,
       yoloRun: true,
-      agitationFlashEnabled: false,
+      theme: 'safelight',
+      cueVolume: 0.8,
+      agitationFlashMode: 'border',
       agitationVibrationEnabled: true,
     });
   });
@@ -34,14 +39,31 @@ describe('userSettings helpers', () => {
   it('falls back for unsupported provider and persistence values', () => {
     expect(normalizeAIProvider('other')).toBe('gemini');
     expect(normalizeApiKeyPersistenceMode('other')).toBe('session');
+    expect(normalizeAppTheme('other')).toBe('dark');
     expect(
       normalizeSettings({
         phaseCountdown: 123,
         yoloRun: 'wrong',
-        agitationFlashEnabled: 'wrong',
+        theme: 'wrong',
+        cueVolume: 'wrong',
+        agitationFlashMode: 'wrong',
         agitationVibrationEnabled: 'wrong',
       }),
     ).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('migrates the legacy agitation flash boolean', () => {
+    expect(normalizeSettings({ agitationFlashEnabled: false }).agitationFlashMode).toBe('off');
+    expect(normalizeSettings({ agitationFlashEnabled: true }).agitationFlashMode).toBe('full');
+    expect(
+      normalizeSettings({ agitationFlashEnabled: false, agitationFlashMode: 'border' })
+        .agitationFlashMode,
+    ).toBe('border');
+  });
+
+  it('clamps cue volume into the 0-1 range', () => {
+    expect(normalizeSettings({ cueVolume: 1.8 }).cueVolume).toBe(1);
+    expect(normalizeSettings({ cueVolume: -2 }).cueVolume).toBe(0);
   });
 
   it('returns mode-specific default temperatures', () => {

@@ -47,7 +47,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ sessions }) => {
   }
 
   return (
-    <section aria-label="Session history" className="w-full max-w-3xl space-y-4">
+    <section
+      aria-label="Session history"
+      className="grid w-full max-w-3xl grid-cols-1 gap-4 lg:max-w-5xl lg:grid-cols-2 lg:items-start"
+    >
       <AnimatePresence initial={false}>
         {sessions.map((session) => {
           const expanded = expandedId === session.id;

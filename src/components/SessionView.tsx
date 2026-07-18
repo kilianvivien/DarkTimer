@@ -12,6 +12,7 @@ interface SessionViewProps {
   initialSession?: ActiveTimerSession | null;
   onExit: () => void;
   onSaveSession: (session: Session) => Promise<void>;
+  onToggleTheme?: () => void;
   settings: UserSettings;
 }
 
@@ -20,6 +21,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
   initialSession = null,
   onExit,
   onSaveSession,
+  onToggleTheme,
   settings,
 }) => {
   const [sessionKey, setSessionKey] = React.useState(0);
@@ -78,10 +80,11 @@ export const SessionView: React.FC<SessionViewProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col landscape:flex-col gap-4 md:gap-8">
+    <div className="w-full flex flex-col landscape:flex-col gap-4 md:gap-8 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
 
-      {/* Recipe info — compact strip in landscape, full card in portrait */}
-      <div className="space-y-3 landscape:space-y-0">
+      {/* Recipe info — compact strip in landscape, full card in portrait,
+          left pane on large screens */}
+      <div className="space-y-3 landscape:space-y-0 lg:space-y-3">
         <button
           onClick={onExit}
           className="flex items-center space-x-2 mono-label hover:text-white transition-colors"
@@ -180,6 +183,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
             onComplete={() => setIsComplete(true)}
             onExitSession={onExit}
             onSessionEnd={handleSessionEnd}
+            onToggleTheme={onToggleTheme}
             settings={settings}
           />
         </div>

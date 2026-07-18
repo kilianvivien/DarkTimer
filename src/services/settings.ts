@@ -16,7 +16,14 @@ import {
   saveStoredSettings,
 } from './storage';
 
-export type { AIProvider, ApiKeyPersistenceMode, PhaseCountdown, UserSettings } from './userSettings';
+export type {
+  AIProvider,
+  AgitationFlashMode,
+  ApiKeyPersistenceMode,
+  AppTheme,
+  PhaseCountdown,
+  UserSettings,
+} from './userSettings';
 export {
   DEFAULT_BW_TEMP_C,
   DEFAULT_COLOR_TEMP_C,

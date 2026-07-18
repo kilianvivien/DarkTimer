@@ -19,6 +19,7 @@ import {
   House,
   Menu,
   Download,
+  Lamp,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from './lib/utils';
@@ -54,6 +55,7 @@ import type { SettingsSaveRequest } from './components/SettingsMenu';
 import type { StoredChem } from './services/chemTypes';
 import {
   applyPwaUpdate,
+  dismissPwaOfflineReady,
   dismissPwaUpdatePrompt,
   getPwaUpdateSnapshot,
   dismissPwaInstallPrompt,
@@ -101,6 +103,16 @@ function getViewIndex(view: View): number {
   return SWIPEABLE_VIEWS.indexOf(view);
 }
 
+function getInitialView(): View {
+  if (typeof window === 'undefined') {
+    return 'manual';
+  }
+
+  // App-shortcut launches (manifest `shortcuts`) land on /?view=<view>.
+  const param = new URLSearchParams(window.location.search).get('view');
+  return param && (SWIPEABLE_VIEWS as string[]).includes(param) ? (param as View) : 'manual';
+}
+
 function isInteractiveTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -122,7 +134,7 @@ const INSTALL_STEP_ICONS = {
 export default function App() {
   const [recipe, setRecipe] = useState<DevRecipe | null>(null);
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
-  const [view, setView] = useState<View>('manual');
+  const [view, setView] = useState<View>(getInitialView);
   const [showHelp, setShowHelp] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [navDirection, setNavDirection] = useState(0);
@@ -185,6 +197,25 @@ export default function App() {
     notify(migrationNotice);
     dismissApiKeyMigrationNotice();
   }, [migrationNotice, notify]);
+
+  useEffect(() => {
+    if (!pwaUpdate.offlineReady) {
+      return;
+    }
+
+    notify('DarkTimer is ready to work offline.');
+    dismissPwaOfflineReady();
+  }, [pwaUpdate.offlineReady, notify]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (settings.theme === 'safelight') {
+      root.dataset.theme = 'safelight';
+    } else {
+      delete root.dataset.theme;
+    }
+  }, [settings.theme]);
 
   useEffect(() => {
     if (!activeTimerSession || view === 'timer' || recipe) {
@@ -305,6 +336,13 @@ export default function App() {
     await saveSettings(nextSettings);
   };
 
+  const handleToggleSafelight = () => {
+    void saveSettings({
+      ...settings,
+      theme: settings.theme === 'safelight' ? 'dark' : 'safelight',
+    });
+  };
+
   const handleUnlockSavedKeys = async (passphrase: string) => {
     await unlockEncryptedApiKeys(passphrase);
     notify('Saved API keys unlocked for this session.');
@@ -418,11 +456,19 @@ export default function App() {
   };
 
   const installInstructions = getInstallInstructions(pwaUpdate.installPlatform);
+  // Prompt after the app has proven useful, not on arrival: at least one finished
+  // session in history or a small preset library.
+  const hasProvenValue = sessions.length >= 1 || presets.length >= 2;
   const showInstallBanner =
     !pwaUpdate.isStandalone &&
     !pwaUpdate.isInstallDismissed &&
     !pwaUpdate.needRefresh &&
+    hasProvenValue &&
+    view !== 'timer' &&
     (pwaUpdate.isInstallPromptAvailable || installInstructions);
+  // Never interrupt a running development session with an update prompt —
+  // reloading mid-development would ruin the film even with session resumption.
+  const showUpdateBanner = pwaUpdate.needRefresh && view !== 'timer';
 
   const activeView = view === 'timer' ? 'manual' : view;
   const viewMotion = reduceMotion
@@ -438,7 +484,7 @@ export default function App() {
       };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-dark-bg text-white flex flex-col font-sans">
+    <div className="min-h-screen min-h-[100dvh] bg-dark-bg text-white flex flex-col font-sans md:pl-24">
       {/* Header */}
       <header className="border-b border-dark-border bg-dark-bg sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div className="max-w-5xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
@@ -453,23 +499,20 @@ export default function App() {
           </button>
 
           <div className="flex items-center">
-            {/* Desktop nav — hidden on mobile */}
-            <div className="hidden md:flex items-center space-x-1">
-              {NAV_ITEMS.map(({ view: v, label }) => (
-                <button
-                  key={v}
-                  onClick={() => changeView(v)}
-                  disabled={view === 'timer'}
-                  className={cn(
-                    "press-feedback px-4 h-14 font-mono text-xs uppercase tracking-widest transition-all border-b-2",
-                    activeView === v ? "border-accent-red text-white" : "border-transparent text-ui-gray hover:text-white",
-                    view === 'timer' && "opacity-30 cursor-not-allowed"
-                  )}
-                >
-                  {label === 'Settings' ? <Settings size={14} /> : label}
-                </button>
-              ))}
-            </div>
+            {/* Safelight quick toggle — always visible */}
+            <button
+              onClick={handleToggleSafelight}
+              className={cn(
+                'press-feedback p-2 transition-colors',
+                settings.theme === 'safelight'
+                  ? 'text-accent-red'
+                  : 'text-ui-gray hover:text-white',
+              )}
+              aria-label={settings.theme === 'safelight' ? 'Switch to standard theme' : 'Switch to safelight theme'}
+              aria-pressed={settings.theme === 'safelight'}
+            >
+              <Lamp size={16} />
+            </button>
             {/* GitHub link — always visible */}
             <a
               href="https://github.com/kilianvivien/DarkTimer"
@@ -491,6 +534,29 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Tablet/desktop navigation rail — phones keep the bottom pill */}
+      <nav
+        aria-label="Primary"
+        className="hidden md:flex fixed inset-y-0 left-0 z-40 w-24 flex-col items-center justify-center gap-1.5 border-r border-dark-border bg-dark-bg pt-[calc(env(safe-area-inset-top)+3.5rem)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+      >
+        {NAV_ITEMS.map(({ view: v, label, Icon }) => (
+          <button
+            key={v}
+            onClick={() => changeView(v)}
+            disabled={view === 'timer'}
+            className={cn(
+              'press-feedback flex w-[4.5rem] flex-col items-center gap-1.5 rounded-xl px-2 py-3 transition-colors',
+              activeView === v ? 'bg-white text-black' : 'text-ui-gray hover:text-white',
+              view === 'timer' && 'opacity-30 cursor-not-allowed',
+            )}
+            aria-current={activeView === v ? 'page' : undefined}
+          >
+            <Icon size={18} />
+            <span className="text-[9px] font-mono uppercase tracking-widest leading-none">{label}</span>
+          </button>
+        ))}
+      </nav>
 
       <motion.main
         className="flex-1 flex flex-col items-center px-4 md:px-6 pt-8 md:pt-12 pb-40 md:pb-8 max-w-5xl mx-auto w-full"
@@ -631,13 +697,14 @@ export default function App() {
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
                 animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="w-full max-w-2xl mx-auto"
+                className="w-full max-w-2xl lg:max-w-5xl mx-auto"
               >
                 <SessionView
                   recipe={recipe}
                   initialSession={resumeSession}
                   onExit={reset}
                   onSaveSession={handleSaveSession}
+                  onToggleTheme={handleToggleSafelight}
                   settings={settings}
                 />
               </motion.div>
@@ -662,7 +729,7 @@ export default function App() {
       </footer>
 
       {/* Mobile bottom nav bar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pointer-events-none">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pointer-events-none">
         <div className="pointer-events-auto mx-auto max-w-md rounded-[1.6rem] border border-white/[0.07] bg-black/60 shadow-[0_-28px_64px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-2xl">
           <div className="flex p-1 gap-0.5">
             {NAV_ITEMS.map(({ view: v, label, Icon }) => (
@@ -801,7 +868,7 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {pwaUpdate.needRefresh && (
+        {showUpdateBanner && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -816,6 +883,11 @@ export default function App() {
                 <p className="text-sm leading-relaxed text-white/72">
                   Reload to install the latest features. Your recipes, history, chemistry, and settings stay on this device.
                 </p>
+                {pwaUpdate.installPlatform === 'ios-safari' && pwaUpdate.isStandalone ? (
+                  <p className="text-xs leading-relaxed text-white/50">
+                    On iOS, fully close and relaunch DarkTimer afterwards to finish the update.
+                  </p>
+                ) : null}
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button

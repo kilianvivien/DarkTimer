@@ -123,8 +123,10 @@ describe('SettingsMenu', () => {
     expect(screen.getByRole('button', { name: /color negative & slide/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('switch', { name: /enable notifications/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /yolo run/i })).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: /flash overlay/i })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /vibration cues/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /full flash/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^border$/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('slider', { name: /cue volume/i })).toBeInTheDocument();
   });
 
   it('disables clear history when there are no saved sessions', () => {

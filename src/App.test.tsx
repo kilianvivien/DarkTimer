@@ -9,6 +9,7 @@ import { setOnlineStatus } from './test/utils';
 const pwaMocks = vi.hoisted(() => ({
   applyPwaUpdate: vi.fn(async () => {}),
   dismissPwaUpdatePrompt: vi.fn(),
+  dismissPwaOfflineReady: vi.fn(),
   dismissPwaInstallPrompt: vi.fn(),
   requestPwaInstall: vi.fn(async () => 'accepted' as const),
   getInstallInstructions: vi.fn(() => ({
@@ -17,6 +18,7 @@ const pwaMocks = vi.hoisted(() => ({
   })),
   pwaSnapshot: {
     needRefresh: false,
+    offlineReady: false,
     isUpdating: false,
     isOnline: true,
     isStandalone: false,
@@ -26,11 +28,15 @@ const pwaMocks = vi.hoisted(() => ({
   } as PwaUpdateState,
 }));
 
+const storedSessionsMock = vi.hoisted(() => ({
+  sessions: [] as unknown[],
+}));
+
 vi.mock('./hooks/useStoredData', () => ({
   useStorageReady: () => true,
   useStoredSettings: () => ({ data: DEFAULT_SETTINGS, isLoading: false, refresh: vi.fn() }),
   useStoredPresets: () => ({ data: [], isLoading: false, refresh: vi.fn() }),
-  useStoredSessions: () => ({ data: [], isLoading: false, refresh: vi.fn() }),
+  useStoredSessions: () => ({ data: storedSessionsMock.sessions, isLoading: false, refresh: vi.fn() }),
   useStoredChems: () => ({ data: [], isLoading: false, refresh: vi.fn() }),
   useStoredActiveTimerSession: () => ({ data: null, isLoading: false, refresh: vi.fn() }),
 }));
@@ -49,6 +55,7 @@ vi.mock('./services/pwa', () => ({
   applyPwaUpdate: pwaMocks.applyPwaUpdate,
   dismissPwaInstallPrompt: pwaMocks.dismissPwaInstallPrompt,
   dismissPwaUpdatePrompt: pwaMocks.dismissPwaUpdatePrompt,
+  dismissPwaOfflineReady: pwaMocks.dismissPwaOfflineReady,
   getPwaUpdateSnapshot: () => pwaMocks.pwaSnapshot,
   getInstallInstructions: pwaMocks.getInstallInstructions,
   requestPwaInstall: pwaMocks.requestPwaInstall,
@@ -60,6 +67,7 @@ describe('App', () => {
   beforeEach(() => {
     pwaMocks.pwaSnapshot = {
       needRefresh: false,
+      offlineReady: false,
       isUpdating: false,
       isOnline: true,
       isStandalone: false,
@@ -67,6 +75,7 @@ describe('App', () => {
       isInstallDismissed: true,
       installPlatform: 'unsupported',
     };
+    storedSessionsMock.sessions = [];
     pwaMocks.applyPwaUpdate.mockClear();
     pwaMocks.dismissPwaInstallPrompt.mockClear();
     pwaMocks.dismissPwaUpdatePrompt.mockClear();
@@ -107,6 +116,7 @@ describe('App', () => {
       isInstallDismissed: false,
       installPlatform: 'desktop-chrome',
     };
+    storedSessionsMock.sessions = [{ id: 'session-1' }];
     const user = userEvent.setup();
 
     render(<App />);

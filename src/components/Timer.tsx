@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X, Play, Pause } from 'lucide-react';
+import { RotateCcw, SkipForward, Bell, BellOff, Minimize, Maximize, X, Play, Pause, Lamp } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { formatTime, cn } from '../lib/utils';
 import {
@@ -30,6 +30,7 @@ interface TimerProps {
   onComplete: () => void;
   onExitSession: () => void;
   onSessionEnd: (result: TimerSessionResult) => Promise<void> | void;
+  onToggleTheme?: () => void;
   settings: UserSettings;
 }
 
@@ -41,6 +42,7 @@ export const Timer: React.FC<TimerProps> = ({
   onComplete,
   onExitSession,
   onSessionEnd,
+  onToggleTheme,
   settings,
 }) => {
   const notificationsEnabled = settings.notificationsEnabled;
@@ -58,6 +60,7 @@ export const Timer: React.FC<TimerProps> = ({
   const [flashKey, setFlashKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImmersiveFallback, setIsImmersiveFallback] = useState(false);
+  const [wakeLockUnavailable, setWakeLockUnavailable] = useState(false);
   const [agitationOverride, setAgitationOverride] = useState<AgitationMode | null>(
     initialSession?.agitationOverride ?? null,
   );
@@ -127,7 +130,7 @@ export const Timer: React.FC<TimerProps> = ({
   };
 
   const triggerFlash = () => {
-    if (!settings.agitationFlashEnabled) {
+    if (settings.agitationFlashMode === 'off') {
       return;
     }
 
@@ -210,6 +213,11 @@ export const Timer: React.FC<TimerProps> = ({
     );
   };
 
+  // Map the 0–1 cue volume setting onto a usable Web Audio gain range for a
+  // square wave: quiet-but-audible at the bottom, loud enough for running
+  // water and fans at the top.
+  const cueGain = () => 0.02 + settings.cueVolume * 0.28;
+
   const playBeep = (freq: number, duration: number) => {
     if (isMutedRef.current) return;
     const ctx = getAudioContext();
@@ -221,7 +229,7 @@ export const Timer: React.FC<TimerProps> = ({
 
     osc.type = 'square';
     osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    gain.gain.setValueAtTime(cueGain(), ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
     osc.connect(gain);
@@ -286,7 +294,8 @@ export const Timer: React.FC<TimerProps> = ({
         if (notificationsEnabled) {
           showNotification(`${current.name} complete`, `Next: ${nextPhase.name}`);
         }
-        triggerVibration(120);
+        // One long pulse for phase-end, distinct from the short-double agitation cue.
+        triggerVibration(400);
         phaseStartedAtRef.current = null;
         setCurrentPhaseIndex(nextPhaseIndex);
         setTimeLeft(nextPhase.duration);
@@ -304,7 +313,7 @@ export const Timer: React.FC<TimerProps> = ({
       if (notificationsEnabled) {
         showNotification('Development complete', 'All phases finished.');
       }
-      triggerVibration([160, 120, 220]);
+      triggerVibration([400, 150, 400]);
       phaseStartedAtRef.current = null;
       setIsActive(false);
       setCountdown(null);
@@ -439,7 +448,8 @@ export const Timer: React.FC<TimerProps> = ({
         lastAgitationCueRef.current = cueKey;
         triggerFlash();
         playBeep(440, 0.2); // Agitation start beep
-        triggerVibration([200, 100, 200]);
+        // Short double pulse — tells agitation apart from phase-end by feel alone.
+        triggerVibration([90, 60, 90]);
         if (notificationsEnabled) {
           showNotification('Agitate now', agitationDetails || undefined);
         }
@@ -457,26 +467,8 @@ export const Timer: React.FC<TimerProps> = ({
       return;
     }
 
-    const playTick = (freq: number, dur: number) => {
-      if (isMutedRef.current) return;
-      const ctx = getAudioContext();
-      if (!ctx || ctx.state !== 'running') {
-        return;
-      }
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      gain.gain.setValueAtTime(0.05, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + dur);
-    };
-
     if (lastCountdownCueRef.current !== countdown) {
-      playTick(countdown === 0 ? 880 : countdown <= 3 ? 660 : 440, countdown === 0 ? 0.5 : 0.08);
+      playBeep(countdown === 0 ? 880 : countdown <= 3 ? 660 : 440, countdown === 0 ? 0.5 : 0.08);
       lastCountdownCueRef.current = countdown;
     }
 
@@ -568,8 +560,10 @@ export const Timer: React.FC<TimerProps> = ({
           wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinel> };
         };
         wakeLockRef.current = await navigatorWithWakeLock.wakeLock?.request('screen')!;
+        setWakeLockUnavailable(false);
       } catch (error) {
         console.error('Failed to acquire wake lock:', error);
+        setWakeLockUnavailable(true);
       }
     };
 
@@ -584,7 +578,12 @@ export const Timer: React.FC<TimerProps> = ({
     };
 
     if (isActive) {
-      void acquireWakeLock();
+      if (typeof navigator !== 'undefined' && !('wakeLock' in navigator)) {
+        // Older iOS Safari — the screen can auto-lock mid-session.
+        setWakeLockUnavailable(true);
+      } else {
+        void acquireWakeLock();
+      }
     } else {
       void releaseWakeLock();
     }
@@ -695,6 +694,7 @@ export const Timer: React.FC<TimerProps> = ({
   };
 
   const currentPhase = phases[currentPhaseIndex];
+  const nextPhase = phases[currentPhaseIndex + 1] ?? null;
   const progress = currentPhase && currentPhase.duration > 0 ? (timeLeft / currentPhase.duration) * 100 : 0;
   const effectiveAgitationMode = agitationOverride ?? currentPhase?.agitationMode ?? null;
   const agitationDetails = getAgitationDescription(effectiveAgitationMode);
@@ -719,6 +719,16 @@ export const Timer: React.FC<TimerProps> = ({
           skipPhase();
         }
       }}
+      onPanEnd={(_event, info) => {
+        // Swipe down exits immersive mode without hunting for a button.
+        if (
+          isImmersiveMode &&
+          info.offset.y > 90 &&
+          Math.abs(info.offset.y) > Math.abs(info.offset.x)
+        ) {
+          void exitFullscreen();
+        }
+      }}
       className={cn(
         "relative overflow-hidden flex flex-col landscape:flex-row bg-dark-panel utilitarian-border w-full transition-colors duration-500 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]",
         isImmersiveMode && "fixed inset-0 z-[70] h-[100dvh] w-screen max-w-none justify-between border-0 bg-dark-bg shadow-none",
@@ -735,15 +745,29 @@ export const Timer: React.FC<TimerProps> = ({
     >
       <AnimatePresence>
         {flashVisible ? (
-          <motion.div
-            key={flashKey}
-            initial={{ opacity: 0 }}
-            animate={reduceMotion ? { opacity: [0, 0.14, 0] } : { opacity: [0, 0.22, 0] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0.18 : 0.5, ease: 'easeOut' }}
-            onAnimationComplete={() => setFlashVisible(false)}
-            className="pointer-events-none absolute inset-0 bg-accent-red"
-          />
+          settings.agitationFlashMode === 'border' ? (
+            // Reduced-flash variant for photosensitive users: a border pulse
+            // instead of lighting up the whole screen.
+            <motion.div
+              key={flashKey}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.85, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0.18 : 0.5, ease: 'easeOut' }}
+              onAnimationComplete={() => setFlashVisible(false)}
+              className="pointer-events-none absolute inset-0 border-4 border-accent-red"
+            />
+          ) : (
+            <motion.div
+              key={flashKey}
+              initial={{ opacity: 0 }}
+              animate={reduceMotion ? { opacity: [0, 0.14, 0] } : { opacity: [0, 0.22, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0.18 : 0.5, ease: 'easeOut' }}
+              onAnimationComplete={() => setFlashVisible(false)}
+              className="pointer-events-none absolute inset-0 bg-accent-red"
+            />
+          )
         ) : null}
       </AnimatePresence>
 
@@ -861,6 +885,20 @@ export const Timer: React.FC<TimerProps> = ({
               transition={{ duration: countdown !== null ? 10 : 1, ease: "linear" }}
             />
           </div>
+
+          {/* Always-visible next-phase preview: pre-position the next chemical
+              without touching the screen. */}
+          <p className="mono-label tabular-nums mt-3">
+            {nextPhase
+              ? `Next: ${nextPhase.name} ${formatTime(nextPhase.duration)}`
+              : 'Last phase'}
+          </p>
+
+          {wakeLockUnavailable && isActive ? (
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ui-gray/80">
+              Screen may sleep — keep your display awake
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -906,7 +944,7 @@ export const Timer: React.FC<TimerProps> = ({
           </button>
 
           {/* Icon buttons — portrait and landscape */}
-          <div className="flex items-center justify-center gap-3 landscape:gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 landscape:gap-2">
             <button
               onClick={toggleMute}
               className="utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0"
@@ -928,6 +966,20 @@ export const Timer: React.FC<TimerProps> = ({
             >
               <SkipForward size={16} />
             </button>
+            {onToggleTheme && (
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                className={cn(
+                  "utilitarian-button flex h-12 w-12 min-w-0 items-center justify-center px-0 py-0",
+                  settings.theme === 'safelight' && "border-accent-red text-accent-red"
+                )}
+                aria-label={settings.theme === 'safelight' ? 'Switch to standard theme' : 'Switch to safelight theme'}
+                aria-pressed={settings.theme === 'safelight'}
+              >
+                <Lamp size={16} />
+              </button>
+            )}
             {!isImmersiveMode && (
               <button
                 type="button"
@@ -943,11 +995,13 @@ export const Timer: React.FC<TimerProps> = ({
         </div>
 
         <div className="space-y-3 pt-4 landscape:pt-0 border-t landscape:border-t-0 border-dark-border landscape:border-none">
-          <p className="mono-label">Swipe left to skip</p>
+          <p className="mono-label">
+            {isImmersiveMode ? 'Swipe left to skip · down to exit' : 'Swipe left to skip'}
+          </p>
           {phases.slice(currentPhaseIndex + 1, currentPhaseIndex + 5).map((phase, i) => (
             <div key={i} className="flex justify-between items-center text-xs font-mono text-ui-gray uppercase">
               <span>{phase.name}</span>
-              <span>{formatTime(phase.duration)}</span>
+              <span className="tabular-nums">{formatTime(phase.duration)}</span>
             </div>
           ))}
         </div>
