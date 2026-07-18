@@ -27,7 +27,7 @@ describe('devChart', () => {
   });
 
   it('returns every dilution when the requested one is not charted', () => {
-    const recipes = findDevChartRecipes('Tri-X 400', 'Rodinal', '1+100', 400, 'bw', DEFAULT_SETTINGS);
+    const recipes = findDevChartRecipes('Pan F Plus', 'Rodinal', '1+100', 50, 'bw', DEFAULT_SETTINGS);
 
     expect(recipes.map((recipe) => recipe.dilution).sort()).toEqual(['1+25', '1+50']);
   });
@@ -72,16 +72,18 @@ describe('devChart', () => {
     expect(p3200.phases[0].duration).toBe(840);
   });
 
-  it('has a manufacturer starting point for every selectable B&W film', () => {
+  it('keeps offline rows limited to selectable B&W films', () => {
     const bwFilms = FILM_STOCK_OPTIONS.filter((film) => film.processModes?.includes('bw'));
 
     expect(bwFilms).toHaveLength(32);
-    for (const film of bwFilms) {
+    for (const entry of BW_DEV_CHART) {
       expect(
-        BW_DEV_CHART.some((entry) => entry.film === film.value),
-        `missing offline entry for ${film.value}`,
+        bwFilms.some((film) => film.value === entry.film),
+        `offline entry is not selectable: ${entry.film}`,
       ).toBe(true);
     }
+
+    expect(findDevChartRecipes('Adox HR-50', 'XTOL', '1+1', 50, 'bw', DEFAULT_SETTINGS)).toEqual([]);
   });
 
   it('uses Harman datasheet times and attribution for Kentmere 200', () => {
@@ -133,9 +135,12 @@ describe('devChart', () => {
 
   it('keeps explicit manufacturer attribution on most offline rows', () => {
     const attributedEntries = BW_DEV_CHART.filter((entry) => entry.source);
+    const unattributedEntries = BW_DEV_CHART.filter((entry) => !entry.source);
 
-    expect(attributedEntries).toHaveLength(127);
-    expect(attributedEntries.every((entry) => /ILFORD|HARMAN|KODAK|FOMA/.test(entry.source ?? ''))).toBe(true);
+    expect(attributedEntries).toHaveLength(166);
+    expect(attributedEntries.every((entry) => /ILFORD|HARMAN|KODAK|FOMA|BERGGER|Rollei|CineStill/.test(entry.source ?? ''))).toBe(true);
+    expect(unattributedEntries).toHaveLength(10);
+    expect(unattributedEntries.every((entry) => entry.developer === 'XTOL' && entry.dilution === 'Stock')).toBe(true);
   });
 
   it('uses the current Kodak small-tank bulletin values', () => {
@@ -171,7 +176,7 @@ describe('devChart', () => {
     const recipes = findDevChartRecipes('CineStill BwXX', 'HC-110', '', 250, 'bw', DEFAULT_SETTINGS);
 
     expect(recipes).toHaveLength(1);
-    expect(recipes[0].film).toBe('Double-X');
+    expect(recipes[0].film).toBe('CineStill BwXX');
     expect(recipes[0].phases[0].duration).toBe(360);
   });
 

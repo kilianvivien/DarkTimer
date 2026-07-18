@@ -44,6 +44,15 @@ const KODAK_BW_SOURCE = 'KODAK Processing Black-and-White Films bulletin (March 
 const FOMAPAN_100_SOURCE = 'FOMA Fomapan 100 Classic technical datasheet';
 const FOMAPAN_200_SOURCE = 'FOMA Fomapan 200 Creative technical datasheet';
 const FOMAPAN_400_SOURCE = 'FOMA Fomapan 400 Action technical datasheet';
+const PAN_F_SOURCE = 'ILFORD Pan F Plus processing chart';
+const ORTHO_PLUS_SOURCE = 'ILFORD Ortho Plus technical datasheet';
+const TMAX_P3200_SOURCE = 'KODAK T-MAX P3200 technical datasheet';
+const BERGGER_PANCRO_400_SOURCE = 'BERGGER Pancro 400 datasheet (January 2017)';
+const ROLLEI_RPX_100_SOURCE = 'Rollei RPX 100 technical datasheet';
+const ROLLEI_RPX_400_SOURCE = 'Rollei RPX 400 technical datasheet';
+const ROLLEI_RETRO_80_SOURCE = 'Rollei Retro 80S technical datasheet';
+const ROLLEI_RETRO_400_SOURCE = 'Rollei Retro 400S technical datasheet';
+const CINESTILL_BWXX_SOURCE = 'CineStill BwXX development-times chart';
 
 // Generic compensation factors for off-chart temperatures and pushed/pulled
 // ratings. Temperature scaling follows a Q10-style curve sitting between the
@@ -144,14 +153,14 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   // Ilford Delta 3200 at EI 3200
   { film: 'Delta 3200', developer: 'DD-X', dilution: '1+4', iso: 3200, devSeconds: 570, tempC: 20, agitationMode: 'every-60s', source: DELTA_3200_SOURCE },
   { film: 'Delta 3200', developer: 'Microphen', dilution: 'Stock', iso: 3200, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: DELTA_3200_SOURCE },
-  { film: 'Delta 3200', developer: 'XTOL', dilution: 'Stock', iso: 3200, devSeconds: 450, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Delta 3200', developer: 'XTOL', dilution: 'Stock', iso: 3200, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: DELTA_3200_SOURCE },
   // Ilford Pan F Plus (ISO 50)
-  { film: 'Pan F Plus', developer: 'ID-11', dilution: 'Stock', iso: 50, devSeconds: 390, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Pan F Plus', developer: 'ID-11', dilution: '1+1', iso: 50, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Pan F Plus', developer: 'XTOL', dilution: 'Stock', iso: 50, devSeconds: 405, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Pan F Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 50, devSeconds: 270, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Pan F Plus', developer: 'Rodinal', dilution: '1+25', iso: 50, devSeconds: 360, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Pan F Plus', developer: 'Rodinal', dilution: '1+50', iso: 50, devSeconds: 660, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Pan F Plus', developer: 'ID-11', dilution: 'Stock', iso: 50, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: PAN_F_SOURCE },
+  { film: 'Pan F Plus', developer: 'ID-11', dilution: '1+1', iso: 50, devSeconds: 510, tempC: 20, agitationMode: 'every-60s', source: PAN_F_SOURCE },
+  { film: 'Pan F Plus', developer: 'XTOL', dilution: 'Stock', iso: 50, devSeconds: 405, tempC: 20, agitationMode: 'every-60s', source: PAN_F_SOURCE },
+  { film: 'Pan F Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 50, devSeconds: 270, tempC: 20, agitationMode: 'every-60s', source: PAN_F_SOURCE },
+  { film: 'Pan F Plus', developer: 'Rodinal', dilution: '1+25', iso: 50, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: PAN_F_SOURCE },
+  { film: 'Pan F Plus', developer: 'Rodinal', dilution: '1+50', iso: 50, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: PAN_F_SOURCE },
   // Ilford SFX 200 (ISO 200)
   { film: 'SFX 200', developer: 'ID-11', dilution: 'Stock', iso: 200, devSeconds: 600, tempC: 20, agitationMode: 'every-60s', source: SFX_200_SOURCE },
   { film: 'SFX 200', developer: 'ID-11', dilution: '1+1', iso: 200, devSeconds: 1020, tempC: 20, agitationMode: 'every-60s', source: SFX_200_SOURCE },
@@ -159,11 +168,10 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   { film: 'SFX 200', developer: 'Ilfosol 3', dilution: '1+14', iso: 200, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: SFX_200_SOURCE },
   { film: 'SFX 200', developer: 'XTOL', dilution: 'Stock', iso: 200, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: SFX_200_SOURCE },
   // Ilford Ortho Plus (ISO 80)
-  { film: 'Ortho Plus', developer: 'ID-11', dilution: 'Stock', iso: 80, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Ortho Plus', developer: 'ID-11', dilution: '1+1', iso: 80, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Ortho Plus', developer: 'Ilfosol 3', dilution: '1+9', iso: 80, devSeconds: 300, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Ortho Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 80, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Ortho Plus', developer: 'XTOL', dilution: '1+1', iso: 80, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Ortho Plus', developer: 'ID-11', dilution: 'Stock', iso: 80, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: ORTHO_PLUS_SOURCE },
+  { film: 'Ortho Plus', developer: 'ID-11', dilution: '1+1', iso: 80, devSeconds: 630, tempC: 20, agitationMode: 'every-60s', source: ORTHO_PLUS_SOURCE },
+  { film: 'Ortho Plus', developer: 'Ilfosol 3', dilution: '1+9', iso: 80, devSeconds: 300, tempC: 20, agitationMode: 'every-60s', source: ORTHO_PLUS_SOURCE },
+  { film: 'Ortho Plus', developer: 'Ilfosol 3', dilution: '1+14', iso: 80, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: ORTHO_PLUS_SOURCE },
   // Kentmere 100 (ISO 100)
   { film: 'Kentmere 100', developer: 'DD-X', dilution: '1+4', iso: 100, devSeconds: 630, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
   { film: 'Kentmere 100', developer: 'Ilfosol 3', dilution: '1+9', iso: 100, devSeconds: 300, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
@@ -181,7 +189,6 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   { film: 'Kentmere 100', developer: 'Microphen', dilution: '1+3', iso: 100, devSeconds: 870, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
   { film: 'Kentmere 100', developer: 'Perceptol', dilution: 'Stock', iso: 100, devSeconds: 750, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
   { film: 'Kentmere 100', developer: 'Perceptol', dilution: '1+1', iso: 100, devSeconds: 930, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_100_SOURCE },
-  { film: 'Kentmere 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Kentmere 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
   // Kentmere Pan 200 (ISO 200). Manufacturer table:
   // https://www.ilfordphoto.com/kentmere-200-35mm
@@ -214,15 +221,11 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   { film: 'Kentmere 400', developer: 'ID-11', dilution: '1+3', iso: 400, devSeconds: 1530, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
   { film: 'Kentmere 400', developer: 'Microphen', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
   { film: 'Kentmere 400', developer: 'Microphen', dilution: '1+1', iso: 400, devSeconds: 900, tempC: 20, agitationMode: 'every-60s', source: KENTMERE_400_SOURCE },
-  { film: 'Kentmere 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 450, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Kentmere 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1050, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Kentmere 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
   // Kodak Tri-X 400
   { film: 'Tri-X 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 405, tempC: 20, agitationMode: 'every-60s', source: KODAK_BW_SOURCE },
-  { film: 'Tri-X 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 585, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Tri-X 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 585, tempC: 20, agitationMode: 'every-60s', source: 'KODAK TRI-X 400 technical datasheet' },
   { film: 'Tri-X 400', developer: 'HC-110', dilution: '1+31', iso: 400, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', note: 'Dilution B.', source: KODAK_BW_SOURCE },
-  { film: 'Tri-X 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Tri-X 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 780, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Tri-X 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: KODAK_BW_SOURCE },
   // Kodak T-Max 100
   { film: 'T-Max 100', developer: 'D-76', dilution: 'Stock', iso: 100, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: KODAK_BW_SOURCE },
@@ -233,75 +236,59 @@ export const BW_DEV_CHART: DevChartEntry[] = [
   { film: 'T-Max 400', developer: 'HC-110', dilution: '1+31', iso: 400, devSeconds: 330, tempC: 20, agitationMode: 'every-60s', note: 'Dilution B.', source: KODAK_BW_SOURCE },
   { film: 'T-Max 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', source: KODAK_BW_SOURCE },
   // Kodak T-Max P3200 at EI 3200
-  { film: 'T-Max P3200', developer: 'D-76', dilution: 'Stock', iso: 3200, devSeconds: 840, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'T-Max P3200', developer: 'XTOL', dilution: 'Stock', iso: 3200, devSeconds: 810, tempC: 20, agitationMode: 'every-60s' },
-  // Kodak Double-X (ISO 250, also sold as CineStill BwXX)
-  { film: 'Double-X', developer: 'D-76', dilution: 'Stock', iso: 250, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Double-X', developer: 'D-76', dilution: '1+1', iso: 250, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Double-X', developer: 'HC-110', dilution: '1+31', iso: 250, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', note: 'Dilution B.' },
-  { film: 'Double-X', developer: 'Rodinal', dilution: '1+25', iso: 250, devSeconds: 345, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Double-X', developer: 'Rodinal', dilution: '1+50', iso: 250, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Double-X', developer: 'XTOL', dilution: 'Stock', iso: 250, devSeconds: 420, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'T-Max P3200', developer: 'D-76', dilution: 'Stock', iso: 3200, devSeconds: 840, tempC: 20, agitationMode: 'every-60s', source: TMAX_P3200_SOURCE },
+  { film: 'T-Max P3200', developer: 'XTOL', dilution: 'Stock', iso: 3200, devSeconds: 810, tempC: 20, agitationMode: 'every-60s', source: TMAX_P3200_SOURCE },
+  // CineStill BwXX (ISO 250; Eastman Double-X / 5222 emulsion)
+  { film: 'CineStill BwXX', developer: 'D-76', dilution: 'Stock', iso: 250, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: CINESTILL_BWXX_SOURCE },
+  { film: 'CineStill BwXX', developer: 'D-76', dilution: '1+1', iso: 250, devSeconds: 600, tempC: 20, agitationMode: 'every-60s', source: CINESTILL_BWXX_SOURCE },
+  { film: 'CineStill BwXX', developer: 'HC-110', dilution: '1+31', iso: 250, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: CINESTILL_BWXX_SOURCE, note: 'Dilution B.' },
+  { film: 'CineStill BwXX', developer: 'XTOL', dilution: 'Stock', iso: 250, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: CINESTILL_BWXX_SOURCE },
   // Fujifilm Acros II (ISO 100)
   { film: 'Acros II', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
   // Fomapan 100 (ISO 100)
   { film: 'Fomapan 100', developer: 'D-76', dilution: 'Stock', iso: 100, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_100_SOURCE },
-  { film: 'Fomapan 100', developer: 'D-76', dilution: '1+1', iso: 100, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Fomapan 100', developer: 'Rodinal', dilution: '1+50', iso: 100, devSeconds: 510, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_100_SOURCE },
   { film: 'Fomapan 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', note: 'Published time is 5–6 minutes; this recipe uses the upper end of the range.', source: FOMAPAN_100_SOURCE },
   // Fomapan 200 (ISO 200)
   { film: 'Fomapan 200', developer: 'D-76', dilution: 'Stock', iso: 200, devSeconds: 330, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_200_SOURCE },
-  { film: 'Fomapan 200', developer: 'D-76', dilution: '1+1', iso: 200, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Fomapan 200', developer: 'Rodinal', dilution: '1+25', iso: 200, devSeconds: 300, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Fomapan 200', developer: 'Rodinal', dilution: '1+50', iso: 200, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_200_SOURCE },
   { film: 'Fomapan 200', developer: 'XTOL', dilution: 'Stock', iso: 200, devSeconds: 360, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_200_SOURCE },
   // Fomapan 400 (ISO 400)
   { film: 'Fomapan 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 450, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_400_SOURCE },
-  { film: 'Fomapan 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Fomapan 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 330, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Fomapan 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 660, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_400_SOURCE },
   { film: 'Fomapan 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 420, tempC: 20, agitationMode: 'every-60s', source: FOMAPAN_400_SOURCE },
   // Bergger Pancro 400 (ISO 400)
-  { film: 'Bergger Pancro 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Bergger Pancro 400', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 1020, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Bergger Pancro 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Bergger Pancro 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1320, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Bergger Pancro 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Bergger Pancro 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: BERGGER_PANCRO_400_SOURCE },
+  { film: 'Bergger Pancro 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 1020, tempC: 20, agitationMode: 'every-60s', source: BERGGER_PANCRO_400_SOURCE },
+  { film: 'Bergger Pancro 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: BERGGER_PANCRO_400_SOURCE },
+  { film: 'Bergger Pancro 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1320, tempC: 20, agitationMode: 'every-60s', source: BERGGER_PANCRO_400_SOURCE },
+  { film: 'Bergger Pancro 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 600, tempC: 20, agitationMode: 'every-60s', source: BERGGER_PANCRO_400_SOURCE },
   // Rollei RPX 100 (ISO 100)
-  { film: 'Rollei RPX 100', developer: 'D-76', dilution: 'Stock', iso: 100, devSeconds: 510, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei RPX 100', developer: 'D-76', dilution: '1+1', iso: 100, devSeconds: 660, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei RPX 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei RPX 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei RPX 100', developer: 'D-76', dilution: 'Stock', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_100_SOURCE },
+  { film: 'Rollei RPX 100', developer: 'D-76', dilution: '1+1', iso: 100, devSeconds: 720, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_100_SOURCE },
+  { film: 'Rollei RPX 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_100_SOURCE },
+  { film: 'Rollei RPX 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_100_SOURCE },
   // Rollei RPX 400 (ISO 400)
-  { film: 'Rollei RPX 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei RPX 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 840, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei RPX 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 720, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei RPX 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1260, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei RPX 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei RPX 400', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_400_SOURCE },
+  { film: 'Rollei RPX 400', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 840, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_400_SOURCE },
+  { film: 'Rollei RPX 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 720, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_400_SOURCE },
+  { film: 'Rollei RPX 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1260, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_400_SOURCE },
+  { film: 'Rollei RPX 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RPX_400_SOURCE },
   // Rollei Retro 80S (ISO 80)
-  { film: 'Rollei Retro 80S', developer: 'Rodinal', dilution: '1+25', iso: 80, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei Retro 80S', developer: 'Rodinal', dilution: '1+50', iso: 80, devSeconds: 840, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei Retro 80S', developer: 'XTOL', dilution: 'Stock', iso: 80, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei Retro 80S', developer: 'Rodinal', dilution: '1+25', iso: 80, devSeconds: 480, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RETRO_80_SOURCE },
+  { film: 'Rollei Retro 80S', developer: 'Rodinal', dilution: '1+50', iso: 80, devSeconds: 840, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RETRO_80_SOURCE },
+  { film: 'Rollei Retro 80S', developer: 'XTOL', dilution: 'Stock', iso: 80, devSeconds: 540, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RETRO_80_SOURCE },
   // Rollei Retro 400S (ISO 400)
-  { film: 'Rollei Retro 400S', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei Retro 400S', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 960, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei Retro 400S', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 630, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'Rollei Retro 400S', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1320, tempC: 20, agitationMode: 'every-60s' },
+  { film: 'Rollei Retro 400S', developer: 'D-76', dilution: 'Stock', iso: 400, devSeconds: 720, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RETRO_400_SOURCE },
+  { film: 'Rollei Retro 400S', developer: 'D-76', dilution: '1+1', iso: 400, devSeconds: 960, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RETRO_400_SOURCE },
+  { film: 'Rollei Retro 400S', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 630, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RETRO_400_SOURCE },
+  { film: 'Rollei Retro 400S', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1320, tempC: 20, agitationMode: 'every-60s', source: ROLLEI_RETRO_400_SOURCE },
   { film: 'Rollei Retro 400S', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 720, tempC: 20, agitationMode: 'every-60s' },
   // AgfaPhoto APX 100 (ISO 100)
-  { film: 'AgfaPhoto APX 100', developer: 'ID-11', dilution: 'Stock', iso: 100, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'AgfaPhoto APX 100', developer: 'ID-11', dilution: '1+1', iso: 100, devSeconds: 690, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'AgfaPhoto APX 100', developer: 'Rodinal', dilution: '1+25', iso: 100, devSeconds: 330, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'AgfaPhoto APX 100', developer: 'Rodinal', dilution: '1+50', iso: 100, devSeconds: 600, tempC: 20, agitationMode: 'every-60s' },
   { film: 'AgfaPhoto APX 100', developer: 'XTOL', dilution: 'Stock', iso: 100, devSeconds: 480, tempC: 20, agitationMode: 'every-60s' },
   // AgfaPhoto APX 400 (ISO 400)
-  { film: 'AgfaPhoto APX 400', developer: 'ID-11', dilution: 'Stock', iso: 400, devSeconds: 570, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'AgfaPhoto APX 400', developer: 'ID-11', dilution: '1+1', iso: 400, devSeconds: 990, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'AgfaPhoto APX 400', developer: 'Rodinal', dilution: '1+25', iso: 400, devSeconds: 690, tempC: 20, agitationMode: 'every-60s' },
-  { film: 'AgfaPhoto APX 400', developer: 'Rodinal', dilution: '1+50', iso: 400, devSeconds: 1260, tempC: 20, agitationMode: 'every-60s' },
   { film: 'AgfaPhoto APX 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 540, tempC: 20, agitationMode: 'every-60s' },
   // Adox specialty films
-  { film: 'Adox HR-50', developer: 'XTOL', dilution: '1+1', iso: 50, devSeconds: 570, tempC: 20, agitationMode: 'every-60s' },
   { film: 'Adox CMS 20 II', developer: 'XTOL', dilution: 'Stock', iso: 25, devSeconds: 390, tempC: 20, agitationMode: 'every-60s', note: 'Published XTOL time is for EI 20; this entry uses the catalog rating of ISO 25 as a close starting point.' },
   // JCH, Kosmo Foto, and Lomography
   { film: 'JCH StreetPan 400', developer: 'XTOL', dilution: 'Stock', iso: 400, devSeconds: 765, tempC: 20, agitationMode: 'every-60s' },

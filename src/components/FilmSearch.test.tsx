@@ -88,7 +88,7 @@ describe('FilmSearch', () => {
       apiKeys: { gemini: '', mistral: '' },
     });
 
-    await fillCoreFields(user, 'Tri-X 400', 'Rodinal');
+    await fillCoreFields(user, 'Tri-X 400', 'D-76');
     await user.click(screen.getByRole('button', { name: /ask ai/i }));
 
     expect(await screen.findByText(/built-in chart found/i)).toBeInTheDocument();

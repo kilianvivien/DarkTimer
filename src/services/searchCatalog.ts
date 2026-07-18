@@ -23,12 +23,12 @@ export const FILM_STOCK_OPTIONS: SearchableOption[] = [
   { value: 'Kentmere 400', label: 'Kentmere 400', keywords: ['kentmere', 'ilford'], processModes: ['bw'], iso: 400 },
   { value: 'SFX 200', label: 'SFX 200', keywords: ['sfx', 'infrared', 'ilford'], processModes: ['bw'], iso: 200 },
   { value: 'Ortho Plus', label: 'Ortho Plus', keywords: ['ortho', 'ilford'], processModes: ['bw'], iso: 80 },
-  // Black & White — Kodak
+  // Black & White — Kodak / CineStill
   { value: 'Tri-X 400', label: 'Tri-X 400', keywords: ['trix', 'kodak'], processModes: ['bw'], iso: 400 },
   { value: 'T-Max 100', label: 'T-Max 100', keywords: ['tmax', 'kodak'], processModes: ['bw'], iso: 100 },
   { value: 'T-Max 400', label: 'T-Max 400', keywords: ['tmax', 'kodak', 'tmy2'], processModes: ['bw'], iso: 400 },
   { value: 'T-Max P3200', label: 'T-Max P3200', keywords: ['p3200', 'tmz', 'kodak', 'tmax'], processModes: ['bw'], iso: 3200 },
-  { value: 'Double-X', label: 'Double-X', keywords: ['xx', 'kodak', 'cinestill', 'bwxx'], processModes: ['bw'], iso: 250 },
+  { value: 'CineStill BwXX', label: 'CineStill BwXX', keywords: ['xx', 'double-x', 'eastman', 'kodak', 'cinestill', '5222'], processModes: ['bw'], iso: 250 },
   // Black & White — Fujifilm
   { value: 'Acros II', label: 'Acros II', keywords: ['acros', 'fujifilm', 'fuji'], processModes: ['bw'], iso: 100 },
   // Black & White — Foma
