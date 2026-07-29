@@ -3,8 +3,8 @@ import { AIRecipeError, toAIRecipeError } from './aiErrors';
 import type { ProcessMode } from './recipe';
 import { DevResponse, buildRecipeLookupPrompt, parseJsonResponse } from './aiShared';
 
-const GEMINI_PRIMARY_MODEL = 'gemini-3.5-flash';
-const GEMINI_FALLBACK_MODELS = ['gemini-3.1-flash-lite'] as const;
+const GEMINI_PRIMARY_MODEL = 'gemini-3.6-flash';
+const GEMINI_FALLBACK_MODELS = ['gemini-3.5-flash-lite'] as const;
 const MAX_UNAVAILABLE_RETRIES = 2;
 
 function getClient(apiKey: string): GoogleGenAI {
@@ -45,7 +45,6 @@ export async function getGeminiDevTimes(
             processMode,
           }),
           config: {
-            temperature: 0.3,
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.OBJECT,
