@@ -1,9 +1,9 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import { AIRecipeError, toAIRecipeError } from './aiErrors';
 import type { ProcessMode } from './recipe';
 import { DevResponse, buildRecipeLookupPrompt, parseJsonResponse } from './aiShared';
 
-const GEMINI_PRIMARY_MODEL = 'gemini-3.7-flash';
+const GEMINI_PRIMARY_MODEL = 'gemini-3.8-flash';
 const GEMINI_FALLBACK_MODELS = ['gemini-3.5-flash-lite'] as const;
 const MAX_UNAVAILABLE_RETRIES = 2;
 
@@ -45,6 +45,10 @@ export async function getGeminiDevTimes(
             processMode,
           }),
           config: {
+            // Recipe lookups are short requests; keep 3.8 Flash below its medium default.
+            thinkingConfig: model === GEMINI_PRIMARY_MODEL
+              ? { thinkingLevel: ThinkingLevel.LOW }
+              : undefined,
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.OBJECT,
