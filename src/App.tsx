@@ -831,10 +831,10 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="help-modal-panel bg-black/70 backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_32px_64px_rgba(0,0,0,0.7)] max-w-md w-full p-6 md:p-8 space-y-6 rounded-2xl"
+              className="help-modal-panel bg-black/70 backdrop-blur-2xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_32px_64px_rgba(0,0,0,0.7)] max-w-md w-full space-y-6 rounded-2xl"
               onClick={e => e.stopPropagation()}
             >
-              <div className="sticky top-0 z-10 -mx-1 flex items-start justify-between bg-black/90 px-1 py-1 backdrop-blur-xl">
+              <div className="help-modal-header flex items-start justify-between bg-black">
                 <h2 className="font-mono text-sm uppercase tracking-widest text-white">How to use DarkTimer</h2>
                 <button
                   type="button"
