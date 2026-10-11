@@ -29,6 +29,33 @@
     --color-dark-panel: #0a0202;
     --color-dark-border: #2b0808;
     --color-accent-red: #ff1a1a;
+    /* Status colors (completed, partial, warnings) would otherwise stay green and amber. */
+    --color-emerald-300: #ff2b2b;
+    --color-emerald-500: #ff2b2b;
+    --color-amber-300: #cc2222;
+    --color-amber-400: #cc2222;
+    --color-amber-500: #cc2222;
+    /* Native control parts the variables above cannot reach. */
+    accent-color: var(--color-accent-red);
+    caret-color: var(--color-white);
+    scrollbar-color: var(--color-dark-border) var(--color-dark-bg);
+  }
+
+  :root[data-theme="safelight"] ::selection {
+    background: var(--color-white);
+    color: var(--color-dark-bg);
+  }
+
+  /* Number steppers are drawn by the browser in grey; arrow keys still step. */
+  :root[data-theme="safelight"] input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  :root[data-theme="safelight"] input[type="number"]::-webkit-inner-spin-button,
+  :root[data-theme="safelight"] input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 
   html {
@@ -132,10 +159,28 @@
 }
 
 .help-modal-panel {
+  --help-modal-pad: 1.5rem;
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1.5rem);
+  /* No top padding: the sticky header supplies it, so nothing scrolls above it. */
+  padding: 0 var(--help-modal-pad) var(--help-modal-pad);
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Opaque and full-bleed so scrolled content never shows through or around it. */
+.help-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 calc(var(--help-modal-pad) * -1);
+  padding: var(--help-modal-pad) var(--help-modal-pad) 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .help-modal-panel {
+    --help-modal-pad: 2rem;
+  }
 }
 
 /*
@@ -209,7 +254,7 @@
     width: min(58rem, calc(100vw - 9rem));
     max-width: none;
     max-height: calc(100dvh - 3rem);
-    padding: 1.5rem 1.75rem;
+    --help-modal-pad: 1.75rem;
   }
 
   .help-modal-grid {
@@ -310,10 +355,12 @@
   .timer-icon-controls > button {
     width: 44px;
     height: 44px;
-    color: rgba(255, 255, 255, 0.78);
+    /* Theme variable, not a fixed white, so safelight mode recolors the icons. */
+    color: var(--color-white);
   }
 
   .timer-icon-controls > button > svg {
+    opacity: 0.78;
     display: block;
     flex: none;
   }

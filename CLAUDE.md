@@ -1,6 +1,6 @@
 # DarkTimer
 
-Darkroom timer app for analog film development. React 19 + Vite 6 + TypeScript + Tailwind CSS v4, shipped as a PWA.
+Darkroom timer app for analog film development. React 19 + Vite 8 + TypeScript + Tailwind CSS v4, shipped as a PWA.
 
 ## Commands
 
@@ -20,7 +20,8 @@ npm run test         # run tests (vitest)
 
 ## Key details
 
-- State is local-only: recipes stored in IndexedDB, API keys in localStorage, nothing sent to a server
+- State is local-only: recipes, sessions, chems and settings stored in IndexedDB; API keys kept for the session or in a passphrase-encrypted vault; nothing sent to a server
+- Backups (Settings → History & Data) export everything except API keys as JSON
 - AI recipe lookup uses Gemini (`@google/genai`) or Mistral; provider/keys configured in Settings UI
 - Timer emits audio cues (440 Hz agitation, 880 Hz phase-end) and optional Web Notifications
 - Deployed as a PWA on Vercel, optimized for phones and tablets

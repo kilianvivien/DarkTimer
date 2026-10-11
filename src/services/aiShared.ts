@@ -118,7 +118,7 @@ export function normalizeDevResponse(
   };
 }
 
-export function isValidDevResponseShape(parsed: unknown): parsed is Partial<DevResponse> & { options: unknown[] } {
+function isValidDevResponseShape(parsed: unknown): parsed is Partial<DevResponse> & { options: unknown[] } {
   return isRecord(parsed) && Array.isArray(parsed.options) && parsed.options.every(isValidOptionShape);
 }
 

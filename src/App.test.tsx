@@ -180,7 +180,7 @@ describe('App', () => {
     expect(screen.getByText(/offline chart and cache first/i)).toBeInTheDocument();
     expect(screen.getByText(/recipes, chemistry, and session history stay on this device/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /how to use darktimer/i }).closest('.help-modal-panel')).toHaveClass('help-modal-panel');
-    expect(screen.getByRole('button', { name: 'Close help' }).parentElement).toHaveClass('sticky');
+    expect(screen.getByRole('button', { name: 'Close help' }).parentElement).toHaveClass('help-modal-header');
 
     await user.click(screen.getByRole('button', { name: 'Close help' }));
     await waitFor(() => {

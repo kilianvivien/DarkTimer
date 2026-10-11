@@ -1,14 +1,7 @@
 import {
-  type ApiKeyPersistenceMode,
-  DEFAULT_BW_TEMP_C,
-  DEFAULT_COLOR_TEMP_C,
   DEFAULT_SETTINGS,
   getDefaultTemperatureForMode,
-  normalizeApiKeyPersistenceMode,
-  normalizeAIProvider,
-  normalizeSettings,
   type AIProvider,
-  type PhaseCountdown,
   type UserSettings,
 } from './userSettings';
 import {
@@ -24,26 +17,14 @@ export type {
   PhaseCountdown,
   UserSettings,
 } from './userSettings';
-export {
-  DEFAULT_BW_TEMP_C,
-  DEFAULT_COLOR_TEMP_C,
-  DEFAULT_SETTINGS,
-  getDefaultTemperatureForMode,
-  normalizeApiKeyPersistenceMode,
-  normalizeAIProvider,
-  normalizeSettings,
-};
-
-export function getSettings(): Promise<UserSettings> {
-  return getStoredSettings();
-}
+export { DEFAULT_SETTINGS, getDefaultTemperatureForMode };
 
 export function saveSettings(settings: UserSettings): Promise<UserSettings> {
   return saveStoredSettings(settings);
 }
 
 export async function saveAiProvider(aiProvider: AIProvider): Promise<UserSettings> {
-  const settings = await getSettings();
+  const settings = await getStoredSettings();
 
   return saveSettings({
     ...settings,
