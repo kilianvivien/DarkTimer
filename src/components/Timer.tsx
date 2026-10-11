@@ -12,6 +12,7 @@ import {
   type SessionStatus,
 } from '../services/recipe';
 import { showNotification } from '../services/notifications';
+import { crossedAgitationPoint, getPhaseCues } from '../services/cueSchedule';
 import { clearStoredActiveTimerSession, saveStoredActiveTimerSession } from '../services/storage';
 import type { UserSettings } from '../services/userSettings';
 
@@ -71,6 +72,11 @@ export const Timer: React.FC<TimerProps> = ({
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastAgitationCueRef = useRef<string | null>(null);
+  const lastElapsedRef = useRef<{ phaseIndex: number; elapsed: number } | null>(null);
+  // True while the running phase's beeps are queued on the audio clock, so the
+  // tick-driven fallbacks stay silent.
+  const cuesScheduledRef = useRef(false);
+  const [audioEpoch, setAudioEpoch] = useState(0);
   const phaseStartedAtRef = useRef<number | null>(initialSession?.phaseStartedAt ?? null);
   const countdownEndsAtRef = useRef<number | null>(initialSession?.countdownEndsAt ?? null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -112,7 +118,10 @@ export const Timer: React.FC<TimerProps> = ({
     }
 
     if (!audioContextRef.current) {
-      audioContextRef.current = new AudioCtx();
+      const ctx = new AudioCtx();
+      // A suspended context freezes its clock, so queued cues must be rebuilt.
+      ctx.onstatechange = () => setAudioEpoch((current) => current + 1);
+      audioContextRef.current = ctx;
     }
 
     return audioContextRef.current;
@@ -286,7 +295,9 @@ export const Timer: React.FC<TimerProps> = ({
 
     if (elapsedSeconds >= current.duration) {
       const nextPhaseIndex = currentPhaseIndex + 1;
-      playBeep(880, 0.5);
+      if (!cuesScheduledRef.current) {
+        playBeep(880, 0.5);
+      }
 
       if (nextPhaseIndex < phases.length) {
         const nextPhase = phases[nextPhaseIndex];
@@ -363,6 +374,7 @@ export const Timer: React.FC<TimerProps> = ({
     setIsImmersiveFallback(false);
     setAgitationOverride(initialSession?.agitationOverride ?? null);
     lastAgitationCueRef.current = null;
+    lastElapsedRef.current = null;
     lastCountdownCueRef.current = null;
     phaseStartedAtRef.current = initialSession?.phaseStartedAt ?? null;
     countdownEndsAtRef.current = initialSession?.countdownEndsAt ?? null;
@@ -430,24 +442,30 @@ export const Timer: React.FC<TimerProps> = ({
     const currentPhase = phases[currentPhaseIndex];
     const effectiveMode = agitationOverride ?? currentPhase.agitationMode;
     const agitationInterval = getAgitationInterval(effectiveMode);
+    const elapsed = currentPhase.duration - timeLeft;
+    const previous = lastElapsedRef.current;
+    const previousElapsed = previous?.phaseIndex === currentPhaseIndex ? previous.elapsed : null;
+    lastElapsedRef.current = { phaseIndex: currentPhaseIndex, elapsed };
 
     if (!agitationInterval) {
       setIsAgitating(false);
       return;
     }
 
-    const elapsed = currentPhase.duration - timeLeft;
     const cycleTime = elapsed % agitationInterval;
     const agitating = elapsed > 0 && cycleTime < AGITATION_ALERT_SECONDS;
     const agitationDetails = getAgitationDescription(effectiveMode);
 
-    if (elapsed > 0 && cycleTime === 0) {
+    // A throttled tab can skip the exact second; still cue while agitation is due.
+    if (crossedAgitationPoint(previousElapsed, elapsed, agitationInterval) && cycleTime < AGITATION_ALERT_SECONDS) {
       const cueKey = `${currentPhaseIndex}:${Math.floor(elapsed / agitationInterval)}`;
 
       if (lastAgitationCueRef.current !== cueKey) {
         lastAgitationCueRef.current = cueKey;
         triggerFlash();
-        playBeep(440, 0.2); // Agitation start beep
+        if (!cuesScheduledRef.current) {
+          playBeep(440, 0.2); // Agitation start beep
+        }
         // Short double pulse — tells agitation apart from phase-end by feel alone.
         triggerVibration([90, 60, 90]);
         if (notificationsEnabled) {
@@ -459,6 +477,65 @@ export const Timer: React.FC<TimerProps> = ({
     setIsAgitating(agitating);
 
   }, [agitationOverride, currentPhaseIndex, isActive, notificationsEnabled, phases, timeLeft]);
+
+  // Queue the phase's beeps on the audio clock, which keeps time when timers
+  // are throttled. Flash, vibration and notifications stay tick-driven.
+  useEffect(() => {
+    const startedAt = phaseStartedAtRef.current;
+    const phase = phases[currentPhaseIndex];
+    const ctx = audioContextRef.current;
+
+    if (!isActive || isMuted || !phase || startedAt === null || !ctx || ctx.state !== 'running') {
+      return;
+    }
+
+    const agitationInterval = getAgitationInterval(agitationOverride ?? phase.agitationMode);
+    const now = Date.now();
+    const volume = cueGain();
+    const queued: { osc: OscillatorNode; startsAt: number }[] = [];
+
+    for (const cue of getPhaseCues(phase.duration, agitationInterval)) {
+      const delay = (startedAt + cue.atSeconds * 1000 - now) / 1000;
+
+      if (delay <= 0) {
+        continue;
+      }
+
+      const startsAt = ctx.currentTime + delay;
+      const duration = cue.kind === 'phase-end' ? 0.5 : 0.2;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(cue.kind === 'phase-end' ? 880 : 440, startsAt);
+      gain.gain.setValueAtTime(volume, startsAt);
+      gain.gain.exponentialRampToValueAtTime(0.001, startsAt + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startsAt);
+      osc.stop(startsAt + duration);
+      queued.push({ osc, startsAt });
+    }
+
+    cuesScheduledRef.current = true;
+
+    return () => {
+      cuesScheduledRef.current = false;
+
+      for (const { osc, startsAt } of queued) {
+        // Leave a cue that is already sounding to finish.
+        if (startsAt <= ctx.currentTime) {
+          continue;
+        }
+
+        try {
+          osc.stop();
+        } catch {
+          // Already stopped.
+        }
+      }
+    };
+  }, [agitationOverride, audioEpoch, currentPhaseIndex, isActive, isMuted, phases, settings.cueVolume]);
 
   // Pre-start countdown
   useEffect(() => {

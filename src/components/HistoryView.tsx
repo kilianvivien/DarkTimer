@@ -3,10 +3,24 @@ import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Clock3, XCircle } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 import { cn, formatTime } from '../lib/utils';
-import { formatTemperature, getProcessLabel, type Session } from '../services/recipe';
+import {
+  formatTemperature,
+  getProcessLabel,
+  type DevRecipe,
+  type Session,
+  type SessionOutcome,
+} from '../services/recipe';
+
+export interface SessionLog {
+  outcome?: SessionOutcome;
+  logNotes?: string;
+}
 
 interface HistoryViewProps {
   sessions: Session[];
+  onUpdateLog?: (id: string, log: SessionLog) => Promise<void>;
+  onRunAgain?: (recipe: DevRecipe) => void;
+  onSavePreset?: (recipe: DevRecipe) => Promise<void>;
 }
 
 const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -32,7 +46,89 @@ const STATUS_META = {
   },
 } as const;
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ sessions }) => {
+const OUTCOME_OPTIONS: { value: SessionOutcome; label: string }[] = [
+  { value: 'thin', label: 'Thin' },
+  { value: 'good', label: 'Good' },
+  { value: 'dense', label: 'Dense' },
+];
+
+const OUTCOME_LABELS: Record<SessionOutcome, string> = {
+  thin: 'Thin',
+  good: 'Good',
+  dense: 'Dense',
+};
+
+interface SessionLogEditorProps {
+  session: Session;
+  onUpdateLog: (id: string, log: SessionLog) => Promise<void>;
+}
+
+const SessionLogEditor: React.FC<SessionLogEditorProps> = ({ session, onUpdateLog }) => {
+  const [notes, setNotes] = React.useState(session.logNotes ?? '');
+  const [error, setError] = React.useState('');
+  const notesId = React.useId();
+
+  const save = async (log: SessionLog) => {
+    setError('');
+
+    try {
+      await onUpdateLog(session.id, log);
+    } catch (saveError) {
+      console.error('Failed to save roll notes:', saveError);
+      setError('Roll notes could not be saved.');
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="mono-label">Negatives</p>
+      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Negative density">
+        {OUTCOME_OPTIONS.map(({ value, label }) => {
+          const selected = session.outcome === value;
+
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => void save({ outcome: selected ? undefined : value })}
+              className={cn(
+                'utilitarian-button px-3 py-2 text-xs font-mono uppercase tracking-widest',
+                selected && 'bg-white text-black border-white',
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="space-y-2">
+        <label htmlFor={notesId} className="mono-label">Roll Notes</label>
+        <textarea
+          id={notesId}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          onBlur={() => {
+            if (notes.trim() !== (session.logNotes ?? '')) {
+              void save({ logNotes: notes });
+            }
+          }}
+          rows={3}
+          placeholder="How did the negatives turn out? What would you change next time?"
+          className="utilitarian-input w-full resize-y"
+        />
+      </div>
+      {error ? <p className="text-xs font-mono text-accent-red" role="alert">{error}</p> : null}
+    </div>
+  );
+};
+
+export const HistoryView: React.FC<HistoryViewProps> = ({
+  sessions,
+  onUpdateLog,
+  onRunAgain,
+  onSavePreset,
+}) => {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
   if (sessions.length === 0) {
@@ -83,6 +179,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ sessions }) => {
                         <StatusIcon size={12} />
                         {status.label}
                       </span>
+                      {session.outcome ? (
+                        <span className="inline-flex items-center border border-dark-border px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-ui-gray">
+                          {OUTCOME_LABELS[session.outcome]}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-accent-red">
                       {session.recipe.developer} • {session.recipe.dilution} • ISO {session.recipe.iso}
@@ -168,6 +269,33 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ sessions }) => {
                         <div className="space-y-1">
                           <p className="mono-label">Source</p>
                           <p className="text-sm leading-relaxed text-ui-gray">{session.recipe.source}</p>
+                        </div>
+                      ) : null}
+
+                      {onUpdateLog ? (
+                        <SessionLogEditor session={session} onUpdateLog={onUpdateLog} />
+                      ) : null}
+
+                      {onRunAgain || onSavePreset ? (
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          {onRunAgain ? (
+                            <button
+                              type="button"
+                              onClick={() => onRunAgain(session.recipe)}
+                              className="utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest"
+                            >
+                              Run Again
+                            </button>
+                          ) : null}
+                          {onSavePreset ? (
+                            <button
+                              type="button"
+                              onClick={() => void onSavePreset(session.recipe)}
+                              className="utilitarian-button px-4 py-3 text-xs font-mono uppercase tracking-widest"
+                            >
+                              Save as Preset
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

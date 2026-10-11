@@ -142,7 +142,76 @@ describe('Timer', () => {
       }
     });
 
-    expect(oscillatorStart).toHaveBeenCalledTimes(2);
+    // Countdown start, countdown end, then the phase-end cue queued ahead of time.
+    expect(oscillatorStart).toHaveBeenCalledTimes(3);
+  });
+
+  it('queues phase cues on the audio clock and cancels them on pause', async () => {
+    const oscillators: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }[] = [];
+
+    class TestAudioContext {
+      state: AudioContextState = 'running';
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(async () => {});
+      createOscillator() {
+        const osc = {
+          type: 'square',
+          frequency: { setValueAtTime: vi.fn() },
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+        };
+        oscillators.push(osc);
+        return osc;
+      }
+      createGain() {
+        return {
+          gain: {
+            setValueAtTime: vi.fn(),
+            exponentialRampToValueAtTime: vi.fn(),
+          },
+          connect: vi.fn(),
+        };
+      }
+    }
+
+    Object.defineProperty(window, 'AudioContext', {
+      configurable: true,
+      value: TestAudioContext,
+    });
+
+    render(
+      <Timer
+        recipeSnapshot={recipe}
+        phases={[{ name: 'Developer', duration: 150, agitationMode: 'every-60s' as const }]}
+        onComplete={vi.fn()}
+        onExitSession={vi.fn()}
+        onSessionEnd={vi.fn()}
+        settings={{ ...DEFAULT_SETTINGS, phaseCountdown: 0 }}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /start/i })[0]);
+    await act(async () => {
+      await flushPromises();
+    });
+
+    expect(oscillators.map((osc) => osc.start.mock.calls[0][0])).toEqual([60, 120, 150]);
+
+    // Reaching the agitation point must not add a second, tick-driven beep.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(61_000);
+    });
+    expect(oscillators).toHaveLength(3);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /pause/i })[0]);
+    await act(async () => {
+      await flushPromises();
+    });
+
+    // Each cue gets its scheduled stop, plus an immediate one when cancelled.
+    expect(oscillators.every((osc) => osc.stop.mock.calls.length === 2)).toBe(true);
   });
 
   it('supports pause, reset, skip, and completion callbacks', async () => {

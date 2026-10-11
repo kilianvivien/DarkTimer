@@ -3,6 +3,7 @@ import type { UserSettings } from './settings';
 export type ProcessMode = 'bw' | 'color';
 export type AgitationMode = 'every-60s' | 'every-30s' | 'stand';
 export type SessionStatus = 'completed' | 'partial' | 'aborted';
+export type SessionOutcome = 'thin' | 'good' | 'dense';
 
 export interface DevPhase {
   name: string;
@@ -30,6 +31,8 @@ export interface Session {
   endTime: number;
   status: SessionStatus;
   phasesCompleted: number;
+  outcome?: SessionOutcome;
+  logNotes?: string;
 }
 
 export interface ActiveTimerSession {

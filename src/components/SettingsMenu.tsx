@@ -23,6 +23,7 @@ import {
   PhaseCountdown,
   UserSettings,
 } from '../services/settings';
+import { BackupSection } from './BackupSection';
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../services/notifications';
 
 export interface SettingsSaveRequest {
@@ -1163,9 +1164,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         <div className="space-y-1">
           <h2 className="text-xl font-bold uppercase tracking-tight">History & Data</h2>
           <p className="text-xs text-ui-gray font-mono uppercase tracking-widest">
-            Manage the local timer sessions saved on this device
+            Manage the data saved on this device
           </p>
         </div>
+
+        <BackupSection />
 
         <div className="border border-dark-border p-4 space-y-4">
           <div className="space-y-1">
