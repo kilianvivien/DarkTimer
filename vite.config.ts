@@ -1,6 +1,5 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -121,14 +120,10 @@ export default defineConfig(() => {
       }),
     ],
     clearScreen: false,
-    resolve: {
-      alias: { '@': path.resolve(import.meta.dirname, '.') },
-    },
     server: {
       port: 3000,
       strictPort: true,
       host: '0.0.0.0',
-      hmr: process.env.DISABLE_HMR === 'true' ? false : true,
     },
     build: {
       target: 'safari13',

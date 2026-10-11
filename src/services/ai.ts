@@ -6,7 +6,6 @@ import type { AIProvider } from './settings';
 import type { DevResponse } from './aiShared';
 
 export type { DevResponse } from './aiShared';
-export { AIRecipeError } from './aiErrors';
 
 export async function getDevTimes(
   provider: AIProvider,

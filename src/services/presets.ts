@@ -1,12 +1,8 @@
 import type { DevRecipe } from './recipe';
 import type { Preset } from './presetTypes';
-import { deleteStoredPreset, getStoredPresets, saveStoredPreset, updateStoredPreset } from './storage';
+import { deleteStoredPreset, saveStoredPreset, updateStoredPreset } from './storage';
 
 export type { Preset } from './presetTypes';
-
-export function getPresets(): Promise<Preset[]> {
-  return getStoredPresets();
-}
 
 export function savePreset(recipe: DevRecipe): Promise<Preset> {
   return saveStoredPreset(recipe);

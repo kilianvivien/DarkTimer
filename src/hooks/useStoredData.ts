@@ -9,7 +9,6 @@ import {
   getStoredSettings,
   getStoredChems,
   getStoredActiveTimerSession,
-  saveStoredSettings,
 } from '../services/storage';
 import type { StoredChem } from '../services/chemTypes';
 import type { UserSettings } from '../services/userSettings';
@@ -127,8 +126,4 @@ export function useStoredActiveTimerSession(): AsyncState<ActiveTimerSession | n
     useCallback((listener: () => void) => subscribeToStorage('activeTimer', listener), []),
     null,
   );
-}
-
-export function persistSettings(settings: UserSettings): Promise<UserSettings> {
-  return saveStoredSettings(settings);
 }

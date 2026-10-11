@@ -1,4 +1,4 @@
-export type PhaseCueKind = 'agitation' | 'phase-end';
+type PhaseCueKind = 'agitation' | 'phase-end';
 
 export interface PhaseCue {
   kind: PhaseCueKind;
