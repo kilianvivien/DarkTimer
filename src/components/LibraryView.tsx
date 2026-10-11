@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PresetLibrary } from './PresetLibrary';
-import { HistoryView } from './HistoryView';
+import { HistoryView, type SessionLog } from './HistoryView';
 import type { Preset } from '../services/presets';
-import type { Session } from '../services/recipe';
+import type { DevRecipe, Session } from '../services/recipe';
 
 type LibraryTab = 'recipes' | 'history';
 
@@ -18,6 +18,9 @@ interface LibraryViewProps {
   onSelect: (preset: Preset) => void;
   onDelete: (id: string) => Promise<void>;
   onEdit: (preset: Preset) => void;
+  onUpdateSessionLog?: (id: string, log: SessionLog) => Promise<void>;
+  onRunSessionAgain?: (recipe: DevRecipe) => void;
+  onSaveSessionPreset?: (recipe: DevRecipe) => Promise<void>;
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -26,6 +29,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onSelect,
   onDelete,
   onEdit,
+  onUpdateSessionLog,
+  onRunSessionAgain,
+  onSaveSessionPreset,
 }) => {
   const [activeTab, setActiveTab] = useState<LibraryTab>('recipes');
   const [tabDirection, setTabDirection] = useState(0);
@@ -87,7 +93,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               transition={{ duration: 0.18, ease: 'easeInOut' }}
               className="w-full flex flex-col items-center"
             >
-              <HistoryView sessions={sessions} />
+              <HistoryView
+                sessions={sessions}
+                onUpdateLog={onUpdateSessionLog}
+                onRunAgain={onRunSessionAgain}
+                onSavePreset={onSaveSessionPreset}
+              />
             </motion.div>
           )}
         </AnimatePresence>

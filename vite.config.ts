@@ -117,38 +117,12 @@ export default defineConfig(() => {
           // iOS fetches launch images itself at install time; precaching all
           // 36 of them would double the SW payload for every platform.
           globIgnores: ['**/splash/**'],
-          runtimeCaching: [
-            {
-              urlPattern: /^https:\/\/generativelanguage\.googleapis\.com\/.*/i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'darktimer-gemini-runtime',
-                expiration: {
-                  maxEntries: 20,
-                  maxAgeSeconds: 60 * 60 * 24 * 7,
-                },
-                networkTimeoutSeconds: 5,
-              },
-            },
-            {
-              urlPattern: /^https:\/\/api\.mistral\.ai\/.*/i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'darktimer-mistral-runtime',
-                expiration: {
-                  maxEntries: 20,
-                  maxAgeSeconds: 60 * 60 * 24 * 7,
-                },
-                networkTimeoutSeconds: 5,
-              },
-            },
-          ],
         },
       }),
     ],
     clearScreen: false,
     resolve: {
-      alias: { '@': path.resolve(__dirname, '.') },
+      alias: { '@': path.resolve(import.meta.dirname, '.') },
     },
     server: {
       port: 3000,
@@ -158,7 +132,6 @@ export default defineConfig(() => {
     },
     build: {
       target: 'safari13',
-      minify: 'esbuild',
       sourcemap: false,
     },
     test: {

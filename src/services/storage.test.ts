@@ -284,4 +284,39 @@ describe('storage service', () => {
       options: [{ film: 'Tri-X', developer: 'HC-110' }],
     });
   });
+
+  it('updates a session outcome and roll notes independently', async () => {
+    const storage = await loadStorage();
+
+    await storage.saveStoredSession({
+      id: 'log-session',
+      recipe: {
+        film: 'HP5',
+        developer: 'ID-11',
+        dilution: '1+1',
+        iso: 400,
+        tempC: 20,
+        processMode: 'bw',
+        phases: [{ name: 'Developer', duration: 60 }],
+        notes: '',
+      },
+      startTime: 1000,
+      endTime: 2000,
+      status: 'completed',
+      phasesCompleted: 1,
+    });
+
+    await storage.updateStoredSessionLog('log-session', { outcome: 'dense' });
+    await storage.updateStoredSessionLog('log-session', { logNotes: 'Cut 10%' });
+
+    await expect(storage.getStoredSessions()).resolves.toMatchObject([
+      { id: 'log-session', outcome: 'dense', logNotes: 'Cut 10%' },
+    ]);
+
+    await storage.updateStoredSessionLog('log-session', { outcome: undefined });
+
+    const [session] = await storage.getStoredSessions();
+    expect(session.outcome).toBeUndefined();
+    expect(session.logNotes).toBe('Cut 10%');
+  });
 });

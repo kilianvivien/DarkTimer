@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HistoryView } from './HistoryView';
 import type { Session } from '../services/recipe';
 
@@ -74,5 +74,41 @@ describe('HistoryView', () => {
     expect(screen.getByText('Massive Dev Chart')).toBeInTheDocument();
     expect(screen.getByText('Developer')).toBeInTheDocument();
     expect(screen.getByText('Fixer')).toBeInTheDocument();
+  });
+
+  it('records the negative outcome and roll notes', async () => {
+    const user = userEvent.setup();
+    const onUpdateLog = vi.fn().mockResolvedValue(undefined);
+
+    render(<HistoryView sessions={sessions} onUpdateLog={onUpdateLog} />);
+
+    await user.click(screen.getByRole('button', { name: /tri-x 400/i }));
+    await user.click(screen.getByRole('button', { name: 'Dense' }));
+
+    expect(onUpdateLog).toHaveBeenLastCalledWith('completed-session', { outcome: 'dense' });
+
+    await user.type(screen.getByLabelText(/roll notes/i), 'Cut 10%');
+    await user.tab();
+
+    expect(onUpdateLog).toHaveBeenLastCalledWith('completed-session', { logNotes: 'Cut 10%' });
+  });
+
+  it('shows a saved outcome and can re-run a session recipe', async () => {
+    const user = userEvent.setup();
+    const onRunAgain = vi.fn();
+
+    render(
+      <HistoryView
+        sessions={[{ ...sessions[0], outcome: 'thin' }, sessions[1]]}
+        onRunAgain={onRunAgain}
+      />,
+    );
+
+    expect(screen.getByText('Thin')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /tri-x 400/i }));
+    await user.click(screen.getByRole('button', { name: /run again/i }));
+
+    expect(onRunAgain).toHaveBeenCalledWith(sessions[0].recipe);
   });
 });

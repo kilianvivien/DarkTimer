@@ -33,10 +33,12 @@ import {
   useStoredChems,
 } from './hooks/useStoredData';
 import { useApiKeySession } from './hooks/useApiKeySession';
+import { requestPersistentStorage } from './services/backup';
 import {
   clearStoredActiveTimerSession,
   clearStoredSessions,
   saveStoredSession,
+  updateStoredSessionLog,
   saveStoredChem,
   updateStoredChem,
   deleteStoredChem,
@@ -383,6 +385,8 @@ export default function App() {
   const handleSaveSession = async (session: Session) => {
     try {
       await saveStoredSession(session);
+      // Once there is history worth keeping, ask the browser not to evict it.
+      void requestPersistentStorage();
 
       if (settings.autoTrackChemRolls && session.status === 'completed') {
         const devName = session.recipe.developer.toLowerCase().trim();
@@ -397,6 +401,13 @@ export default function App() {
       console.error('Failed to save session history entry:', error);
       notify('Session history could not be saved.', 'error');
     }
+  };
+
+  const handleUpdateSessionLog = async (
+    id: string,
+    log: { outcome?: Session['outcome']; logNotes?: string },
+  ) => {
+    await updateStoredSessionLog(id, log);
   };
 
   const handleClearHistory = async () => {
@@ -702,6 +713,9 @@ export default function App() {
                   onSelect={handleStartTimer}
                   onDelete={handleDeletePreset}
                   onEdit={handleEditPreset}
+                  onUpdateSessionLog={handleUpdateSessionLog}
+                  onRunSessionAgain={handleStartTimer}
+                  onSaveSessionPreset={handleSavePreset}
                 />
               </motion.div>
             </Suspense>

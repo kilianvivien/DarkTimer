@@ -47,8 +47,10 @@ AI-generated development times are starting points, not authoritative processing
 
 - Save, edit, reuse, and delete recipe presets.
 - Review timer sessions with status, timing, completed phases, compensation, and the recipe snapshot used for the run.
+- Rate each roll's negatives (thin, good, dense), add notes, and re-run or save a past session's recipe.
 - Track developer and fixer batches by mix date, expiration, capacity, and roll count.
 - Optionally increment a matched developer's roll count after a completed session.
+- Export presets, history, chemistry, and settings to a JSON backup and restore it on another device or browser. API keys are never included.
 
 ## Privacy and offline behavior
 

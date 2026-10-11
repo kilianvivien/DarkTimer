@@ -5,6 +5,7 @@ import {
   type ActiveTimerSession,
   type DevRecipe,
   type Session,
+  type SessionOutcome,
   type SessionStatus,
 } from './recipe';
 import type { Preset } from './presetTypes';
@@ -216,6 +217,10 @@ function normalizeSessionStatus(value: unknown): SessionStatus {
   return 'aborted';
 }
 
+function normalizeSessionOutcome(value: unknown): SessionOutcome | undefined {
+  return value === 'thin' || value === 'good' || value === 'dense' ? value : undefined;
+}
+
 function normalizeSession(session: unknown): Session {
   const raw = typeof session === 'object' && session !== null ? session : {};
   const rawId = 'id' in raw ? raw.id : undefined;
@@ -224,6 +229,9 @@ function normalizeSession(session: unknown): Session {
   const rawEndTime = 'endTime' in raw ? raw.endTime : undefined;
   const rawStatus = 'status' in raw ? raw.status : undefined;
   const rawPhasesCompleted = 'phasesCompleted' in raw ? raw.phasesCompleted : undefined;
+  const outcome = normalizeSessionOutcome('outcome' in raw ? raw.outcome : undefined);
+  const rawLogNotes = 'logNotes' in raw ? raw.logNotes : undefined;
+  const logNotes = typeof rawLogNotes === 'string' ? rawLogNotes.trim() : '';
   const startTime =
     typeof rawStartTime === 'number' && Number.isFinite(rawStartTime) ? rawStartTime : Date.now();
   const endTime =
@@ -239,6 +247,8 @@ function normalizeSession(session: unknown): Session {
       typeof rawPhasesCompleted === 'number' && Number.isFinite(rawPhasesCompleted)
         ? Math.max(0, Math.round(rawPhasesCompleted))
         : 0,
+    ...(outcome ? { outcome } : {}),
+    ...(logNotes ? { logNotes } : {}),
   };
 }
 
@@ -447,6 +457,26 @@ export async function saveStoredSession(session: Session): Promise<Session> {
   return normalized;
 }
 
+export async function updateStoredSessionLog(
+  id: string,
+  log: { outcome?: SessionOutcome; logNotes?: string },
+): Promise<Session> {
+  await initStorage();
+  const db = await getDb();
+  const existing = await db.get('sessions', id);
+
+  if (!existing) {
+    throw new Error('Session not found.');
+  }
+
+  // Only the fields present in the patch change, so saving one never clears the other.
+  const updated = normalizeSession({ ...existing, ...log });
+  await db.put('sessions', updated);
+  emit('sessions');
+
+  return updated;
+}
+
 export async function clearStoredSessions(): Promise<void> {
   await initStorage();
   const db = await getDb();
@@ -601,6 +631,88 @@ export async function incrementChemRollCount(id: string): Promise<StoredChem> {
   await db.put('chems', updated);
   emit('chems');
   return updated;
+}
+
+export interface StoredDataSnapshot {
+  settings: UserSettings;
+  presets: Preset[];
+  sessions: Session[];
+  chems: StoredChem[];
+}
+
+export interface StoredDataImport {
+  settings?: unknown;
+  presets: unknown[];
+  sessions: unknown[];
+  chems: unknown[];
+}
+
+export interface StoredDataImportResult {
+  presets: number;
+  sessions: number;
+  chems: number;
+  settingsRestored: boolean;
+}
+
+// API keys and the encrypted vault are deliberately left out of snapshots.
+export async function exportStoredData(): Promise<StoredDataSnapshot> {
+  const [settings, presets, sessions, chems] = await Promise.all([
+    getStoredSettings(),
+    getStoredPresets(),
+    getStoredSessions(),
+    getStoredChems(),
+  ]);
+
+  return { settings, presets, sessions, chems };
+}
+
+// Merges into existing data: records sharing an id are overwritten, the rest are kept.
+export async function importStoredData(data: StoredDataImport): Promise<StoredDataImportResult> {
+  await initStorage();
+  const db = await getDb();
+  const currentSettings = await getStoredSettings();
+  const tx = db.transaction(['settings', 'presets', 'sessions', 'chems'], 'readwrite');
+
+  for (const preset of data.presets) {
+    tx.objectStore('presets').put(normalizePreset(preset));
+  }
+
+  for (const session of data.sessions) {
+    tx.objectStore('sessions').put(normalizeSession(session));
+  }
+
+  for (const chem of data.chems) {
+    tx.objectStore('chems').put(normalizeChem(chem));
+  }
+
+  const settingsRestored = typeof data.settings === 'object' && data.settings !== null;
+
+  if (settingsRestored) {
+    tx.objectStore('settings').put({
+      key: SETTINGS_KEY,
+      value: {
+        ...normalizeSettings(data.settings),
+        // Key storage depends on the vault on this device, which backups never carry.
+        apiKeyPersistenceMode: currentSettings.apiKeyPersistenceMode,
+      },
+    });
+  }
+
+  await tx.done;
+
+  emit('presets');
+  emit('sessions');
+  emit('chems');
+  if (settingsRestored) {
+    emit('settings');
+  }
+
+  return {
+    presets: data.presets.length,
+    sessions: data.sessions.length,
+    chems: data.chems.length,
+    settingsRestored,
+  };
 }
 
 export async function clearAllData(): Promise<void> {
